@@ -1,0 +1,16 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "skala-skct-tutorial",
+  "main": "./worker/index.ts",
+  "compatibility_date": "2026-08-01",
+  // Static assets = the Vite client build. `single-page-application` serves
+  // index.html for any client route that isn't a real file. The Vite plugin
+  // injects the assets directory, so we don't set it here.
+  "assets": {
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+  "observability": {
+    "enabled": true
+  }
+}
