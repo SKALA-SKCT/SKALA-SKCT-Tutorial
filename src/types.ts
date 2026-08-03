@@ -32,7 +32,7 @@ export interface Step {
 export interface Problem {
   id: string;
   type: ProblemType;
-  /** Short label for pills, e.g. "빈칸 추론 · 빈칸 1개". */
+  /** Short label for pills, e.g. "빈칸 추론 / 빈칸 1개". */
   typeLabel: string;
   /** One-line description shown on the home card. */
   typeSummary: string;
