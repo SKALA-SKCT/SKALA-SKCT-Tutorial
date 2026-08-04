@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
-function MemoTextarea({ resetKey }: { resetKey: string }) {
+function MemoTextarea() {
   const [memo, setMemo] = useState("");
-  useEffect(() => setMemo(""), [resetKey]);
   return (
     <textarea
       value={memo}
@@ -19,22 +18,62 @@ export default function MemoPad({ resetKey }: { resetKey: number | string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
   const last = useRef<{ x: number; y: number } | null>(null);
+
+  const initializeCanvas = useRef((canvas: HTMLCanvasElement | null) => {
+    canvasRef.current = canvas;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+  }).current;
+
   const clearCanvas = () =>
     canvasRef.current
       ?.getContext("2d")
       ?.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width;
-    canvas.height = rect.height;
-  }, [tab, resetKey]);
+  const clearActiveTool = () => {
+    if (tab === "memo") {
+      setMemoReset((value) => value + 1);
+      return;
+    }
+
+    clearCanvas();
+  };
 
   const position = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  };
+
+  const startDrawing = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    drawing.current = true;
+    last.current = position(event);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const draw = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!drawing.current || !last.current) return;
+
+    const context = event.currentTarget.getContext("2d");
+    if (!context) return;
+
+    const point = position(event);
+    context.globalCompositeOperation = tool === "eraser" ? "destination-out" : "source-over";
+    context.strokeStyle = "#18181b";
+    context.lineWidth = tool === "eraser" ? 9 : 2;
+    context.lineCap = "round";
+    context.beginPath();
+    context.moveTo(last.current.x, last.current.y);
+    context.lineTo(point.x, point.y);
+    context.stroke();
+    last.current = point;
+  };
+
+  const stopDrawing = () => {
+    drawing.current = false;
+    last.current = null;
   };
 
   return (
@@ -56,44 +95,21 @@ export default function MemoPad({ resetKey }: { resetKey: number | string }) {
             </button>
           </div>
         )}
-        <button
-          className="memo-clear"
-          onClick={() => (tab === "memo" ? setMemoReset((value) => value + 1) : clearCanvas())}
-        >
+        <button className="memo-clear" onClick={clearActiveTool}>
           전체 지우기
         </button>
       </div>
       <div className="memo-body">
         {tab === "memo" ? (
-          <MemoTextarea resetKey={`${resetKey}:${memoReset}`} />
+          <MemoTextarea key={`${resetKey}:${memoReset}`} />
         ) : (
           <canvas
-            ref={canvasRef}
-            onPointerDown={(event) => {
-              drawing.current = true;
-              last.current = position(event);
-              event.currentTarget.setPointerCapture(event.pointerId);
-            }}
-            onPointerMove={(event) => {
-              if (!drawing.current || !last.current) return;
-              const context = event.currentTarget.getContext("2d");
-              if (!context) return;
-              const point = position(event);
-              context.globalCompositeOperation =
-                tool === "eraser" ? "destination-out" : "source-over";
-              context.strokeStyle = "#18181b";
-              context.lineWidth = tool === "eraser" ? 9 : 2;
-              context.lineCap = "round";
-              context.beginPath();
-              context.moveTo(last.current.x, last.current.y);
-              context.lineTo(point.x, point.y);
-              context.stroke();
-              last.current = point;
-            }}
-            onPointerUp={() => {
-              drawing.current = false;
-              last.current = null;
-            }}
+            key={resetKey}
+            ref={initializeCanvas}
+            onPointerDown={startDrawing}
+            onPointerMove={draw}
+            onPointerUp={stopDrawing}
+            onPointerCancel={stopDrawing}
           />
         )}
       </div>

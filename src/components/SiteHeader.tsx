@@ -1,16 +1,9 @@
 import { useEffect, useState } from "react";
+import { getCurrentUserName, logout as requestLogout } from "../api/auth";
 
 const motherUrl = "https://www.skala-skct.com";
 const mockUrl = "https://mock.skala-skct.com";
 const practiceUrl = "https://practice.skala-skct.com";
-
-function isUserResponse(value: unknown): value is { nick?: string; nickname?: string } {
-  if (typeof value !== "object" || value === null) return false;
-  return (
-    ("nick" in value && (typeof value.nick === "string" || value.nick === undefined)) ||
-    ("nickname" in value && (typeof value.nickname === "string" || value.nickname === undefined))
-  );
-}
 
 export default function SiteHeader() {
   const [accountOpen, setAccountOpen] = useState(false);
@@ -18,18 +11,14 @@ export default function SiteHeader() {
 
   useEffect(() => {
     if (import.meta.env.DEV) return;
-    fetch("/api/auth/me")
-      .then(async (response) => {
-        if (!response.ok) return;
-        const user: unknown = await response.json();
-        setUserName(isUserResponse(user) ? (user.nick ?? user.nickname ?? null) : null);
-      })
+    getCurrentUserName()
+      .then(setUserName)
       .catch(() => setUserName(null));
   }, []);
 
-  const logout = async () => {
+  const handleLogout = async () => {
     if (!import.meta.env.DEV) {
-      await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
+      await requestLogout().catch(() => undefined);
     }
     window.location.href = `${motherUrl}/login`;
   };
@@ -69,7 +58,7 @@ export default function SiteHeader() {
               </button>
               <div className={`account-dropdown${accountOpen ? " open" : ""}`} role="menu">
                 <div className="account-dropdown-panel">
-                  <button type="button" role="menuitem" onClick={logout}>
+                  <button type="button" role="menuitem" onClick={handleLogout}>
                     로그아웃
                   </button>
                   <a href={`${motherUrl}/settings`} role="menuitem">

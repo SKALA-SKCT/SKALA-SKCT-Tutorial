@@ -15,6 +15,64 @@ interface RouteState {
   mode: RouteMode;
 }
 
+interface PageProps {
+  route: RouteState;
+  navigate: (path: string) => void;
+}
+
+function Page({ route, navigate }: PageProps) {
+  const category = CATEGORIES.find((item) => item.id === route.categoryId) ?? null;
+  const subtype: Subtype | null =
+    category?.subtypes.find((item) => item.id === route.subtypeId) ?? null;
+
+  if (category && subtype && route.mode === "tutorial") {
+    const tutorial = PROBLEMS.find((problem) => problem.id === subtype.tutorialId);
+    if (tutorial) {
+      return (
+        <TutorialPlayer
+          problem={tutorial}
+          title={`${category.name} ${subtype.name} 풀이 튜토리얼`}
+          onBack={() => navigate(`/${category.id}/${subtype.id}`)}
+        />
+      );
+    }
+  }
+
+  if (category && subtype && route.mode === "examples") {
+    return (
+      <ExampleQuiz
+        category={category}
+        subtype={subtype}
+        onBack={() => navigate(`/${category.id}/${subtype.id}`)}
+      />
+    );
+  }
+
+  if (category && subtype) {
+    return (
+      <StudyHub
+        category={category}
+        subtype={subtype}
+        onBack={() => navigate(`/${category.id}`)}
+        onTutorial={() => navigate(`/${category.id}/${subtype.id}/tutorial`)}
+        onExamples={() => navigate(`/${category.id}/${subtype.id}/examples`)}
+      />
+    );
+  }
+
+  if (category) {
+    return (
+      <CategoryPage
+        category={category}
+        onBack={() => navigate("/")}
+        onSelect={(item) => navigate(`/${category.id}/${item.id}`)}
+      />
+    );
+  }
+
+  return <Home categories={CATEGORIES} onSelect={(id) => navigate(`/${id}`)} />;
+}
+
 export default function App() {
   const readRoute = (): RouteState => {
     const [, categoryId = null, subtypeId = null, routeMode = null] =
@@ -33,47 +91,13 @@ export default function App() {
     setRoute(readRoute());
     window.scrollTo(0, 0);
   };
-  const categoryId = route.categoryId;
-  const category = CATEGORIES.find((item) => item.id === categoryId) ?? null;
-  const subtype: Subtype | null =
-    category?.subtypes.find((item) => item.id === route.subtypeId) ?? null;
-  const mode = route.mode;
-  const tutorial = PROBLEMS.find((problem) => problem.id === subtype?.tutorialId) ?? null;
-  const examMode = mode === "tutorial" || mode === "examples";
+  const examMode = route.mode === "tutorial" || route.mode === "examples";
 
   return (
     <div className="app-shell">
       {!examMode && <SiteHeader />}
       <main className={`app${examMode ? " exam-app" : ""}`}>
-        {category && subtype && mode === "tutorial" && tutorial ? (
-          <TutorialPlayer
-            problem={tutorial}
-            title={`${category.name} ${subtype.name} 풀이 튜토리얼`}
-            onBack={() => navigate(`/${category.id}/${subtype.id}`)}
-          />
-        ) : category && subtype && mode === "examples" ? (
-          <ExampleQuiz
-            category={category}
-            subtype={subtype}
-            onBack={() => navigate(`/${category.id}/${subtype.id}`)}
-          />
-        ) : category && subtype ? (
-          <StudyHub
-            category={category}
-            subtype={subtype}
-            onBack={() => navigate(`/${category.id}`)}
-            onTutorial={() => navigate(`/${category.id}/${subtype.id}/tutorial`)}
-            onExamples={() => navigate(`/${category.id}/${subtype.id}/examples`)}
-          />
-        ) : category ? (
-          <CategoryPage
-            category={category}
-            onBack={() => navigate("/")}
-            onSelect={(item) => navigate(`/${category.id}/${item.id}`)}
-          />
-        ) : (
-          <Home categories={CATEGORIES} onSelect={(id) => navigate(`/${id}`)} />
-        )}
+        <Page route={route} navigate={navigate} />
       </main>
     </div>
   );
