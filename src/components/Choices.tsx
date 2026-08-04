@@ -7,12 +7,7 @@ interface Props {
   highlightIds: string[];
 }
 
-export default function Choices({
-  choices,
-  answerId,
-  revealed,
-  highlightIds,
-}: Props) {
+export default function Choices({ choices, answerId, revealed, highlightIds }: Props) {
   return (
     <ol className="choices">
       {choices.map((c) => {

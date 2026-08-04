@@ -150,8 +150,7 @@ export const PROBLEMS: Problem[] = [
     answerId: "4",
     steps: [
       {
-        narration:
-          "이 유형은 <보기>부터 읽는 게 핵심입니다. 먼저 보기 내용을 확인해 볼게요.",
+        narration: "이 유형은 <보기>부터 읽는 게 핵심입니다. 먼저 보기 내용을 확인해 볼게요.",
         highlightBox: true,
       },
       {
@@ -160,8 +159,7 @@ export const PROBLEMS: Problem[] = [
         highlightBox: true,
       },
       {
-        narration:
-          "이제 지문을 읽습니다. 노화 과정의 조절과 역학을 연구하고 있다는 도입부네요.",
+        narration: "이제 지문을 읽습니다. 노화 과정의 조절과 역학을 연구하고 있다는 도입부네요.",
         highlight: ["s1"],
       },
       {

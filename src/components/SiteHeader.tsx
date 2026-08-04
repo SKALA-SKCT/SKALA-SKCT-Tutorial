@@ -6,15 +6,15 @@ const practiceUrl = "https://practice.skala-skct.com";
 
 function isUserResponse(value: unknown): value is { nick?: string; nickname?: string } {
   if (typeof value !== "object" || value === null) return false;
-  return ("nick" in value && (typeof value.nick === "string" || value.nick === undefined)) ||
-    ("nickname" in value && (typeof value.nickname === "string" || value.nickname === undefined));
+  return (
+    ("nick" in value && (typeof value.nick === "string" || value.nick === undefined)) ||
+    ("nickname" in value && (typeof value.nickname === "string" || value.nickname === undefined))
+  );
 }
 
 export default function SiteHeader() {
   const [accountOpen, setAccountOpen] = useState(false);
-  const [userName, setUserName] = useState<string | null>(
-    import.meta.env.DEV ? "개발자" : null,
-  );
+  const [userName, setUserName] = useState<string | null>(import.meta.env.DEV ? "개발자" : null);
 
   useEffect(() => {
     if (import.meta.env.DEV) return;
@@ -22,7 +22,7 @@ export default function SiteHeader() {
       .then(async (response) => {
         if (!response.ok) return;
         const user: unknown = await response.json();
-        setUserName(isUserResponse(user) ? user.nick ?? user.nickname ?? null : null);
+        setUserName(isUserResponse(user) ? (user.nick ?? user.nickname ?? null) : null);
       })
       .catch(() => setUserName(null));
   }, []);
