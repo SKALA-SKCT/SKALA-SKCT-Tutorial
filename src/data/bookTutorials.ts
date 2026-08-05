@@ -93,7 +93,7 @@ const CASES: Record<string, TutorialCase> = {
     "⑤는 외관 검사와 결과 승인의 순서를 반대로 제시합니다.",
   ),
   "verbal-match-unmentioned": t(
-    "다음 글의 내용과 일치하지 않는 것은?",
+    "다음 글에서 언급되지 않은 것은?",
     "한 공공도서관은 퇴근 뒤 방문하는 이용자가 늘자 평일 운영 시간을 밤 10시까지 연장했다. 저녁 시간에는 도서 대출보다 개인 학습과 공동 작업 수요가 많다는 사전 조사 결과를 반영했다. 도서관은 창가에 있던 전시대를 옮겨 열람 좌석을 40석 늘리고 각 좌석에 전원 시설을 설치했다. 노트북을 사용하는 이용자가 충전 장소를 찾기 위해 자리를 옮기는 불편을 줄이기 위해서였다. 조용한 학습을 원하는 이용자와 대화가 필요한 이용자가 충돌하지 않도록 협업 구역도 별도로 마련했다. 협업 구역에는 예약 가능한 작은 회의실 두 곳을 배치했다. 운영 첫 달에는 시간대별 좌석 이용률과 소음 민원을 함께 조사해 공간 배치를 다시 조정했다.",
     [
       "운영 시간 연장",
@@ -689,18 +689,156 @@ const CASE_DETAILS: Partial<Record<string, string>> = {
     "준비와 정리에 걸리는 시간은 완료 기간에 이미 포함되어 있고 작업의 난이도는 날짜에 따라 달라지지 않는다.",
   "math-age":
     "월이나 일 단위의 차이는 계산하지 않으며 5년 후의 시점도 두 사람의 생일이 지난 뒤로 본다.",
+};
+
+/**
+ * 문제 조건이 아니라 풀이할 때 주의할 점.
+ * 지문에 섞이면 <조건>의 일부처럼 읽히므로 3단계 서술로만 노출한다.
+ */
+const CASE_CAUTIONS: Partial<Record<string, string>> = {
   "logic-conclusion-blank":
-    "일부 구성원의 존재를 전체 집합의 존재로 확대하지 않고 제시된 전제에서 직접 이어지는 포함 관계만 사용한다.",
+    "일부 구성원의 존재를 전체 집합의 존재로 확대하지 말고 전제에서 직접 이어지는 포함 관계만 사용합니다.",
   "logic-premise-small":
-    "단지 결론과 함께 참일 수 있는 전제가 아니라 결론이 언제나 성립하도록 보장하는 전제를 찾아야 한다.",
+    "결론과 함께 참일 수 있는 전제가 아니라 결론이 언제나 성립하도록 보장하는 전제를 찾아야 합니다.",
   "logic-premise-large":
-    "어떤 구성원의 존재만 말하는 문장으로 모든 기자에 대한 결론을 만들 수 없다는 점에 유의한다.",
-  "logic-some-mmo":
-    "모든 관계의 방향을 반대로 바꾸거나 어떤 대상을 전체 대상으로 확대해서는 안 된다.",
+    "어떤 구성원의 존재만 말하는 문장으로는 모든 기자에 대한 결론을 만들 수 없습니다.",
+  "logic-some-mmo": "모든 관계의 방향을 뒤집거나 어떤 대상을 전체 대상으로 넓히면 안 됩니다.",
   "logic-linear":
-    "가능한 배열이 여러 개라면 그중 한 배열이 아니라 모든 배열에서 같은 자리에 놓이는 사람을 찾아야 한다.",
+    "가능한 배열이 여럿이면 한 배열이 아니라 모든 배열에서 같은 자리에 놓이는 사람을 찾아야 합니다.",
+  "logic-number": "배정이 하나로 정해질 때까지 이미 쓴 숫자와 남은 숫자를 구분합니다.",
+};
+
+/** 4단계에서 실제로 어떤 선지가 왜 지워지는지 문항별로 적는다. */
+const CASE_ELIMINATIONS: Record<string, string> = {
+  "verbal-topic":
+    "①과 ②는 본문이 다루지 않은 제작 비용과 폭염 발생 원인이고, ④는 근거가 없으며, ⑤는 마지막 부분의 소재일 뿐 글 전체를 포괄하지 못합니다.",
+  "verbal-blank-single":
+    "①과 ⑤는 기록의 목적과 무관하고, ③은 회의록을 평가 도구로 본 근거가 없으며, ④는 빈칸 앞의 담당자와 기한 설명으로 이어지지 않습니다.",
+  "verbal-blank-position":
+    "(A) 앞에는 예측 성능에 대한 기대가 아직 나오지 않아 ‘그러나’가 받을 대상이 없고, (C)~(E)는 이미 한계 사례가 시작된 뒤라 반전 문장이 겹칩니다.",
+  "verbal-match-predicate":
+    "①의 6개월, ②의 200명, ③의 수면 시간 24분 증가, ⑤의 주 1회 집단 결과는 모두 본문에 같은 서술어로 제시되어 있습니다.",
+  "verbal-match-range":
+    "①은 6개월을 1년으로, ②는 1,200명을 1,020명으로, ③은 주 1회 이상 62%를 매일 62%로, ⑤는 40대와 20대를 뒤바꿨습니다.",
+  "verbal-match-order":
+    "①의 표본 추출이 첫 단계, ②의 외관 검사 뒤 성능 시험, ③의 성능 시험 뒤 승인, ④의 재검수 뒤 성능 시험은 모두 본문의 절차와 같습니다.",
+  "verbal-match-unmentioned":
+    "①은 밤 10시까지 연장, ②는 좌석 40석 확충, ③은 좌석마다 전원 시설 설치, ④는 협업 구역 마련이라는 근거 문장을 본문에서 찾을 수 있습니다.",
+  "verbal-paragraph-order":
+    "①과 ⑤는 앞 내용을 받는 (가)와 (라)를 첫 문단에 두었고, ②는 (라)가 도입한 시스템을 (다)가 설명한다는 순서를 어겼으며, ③은 결과인 (가)를 작동 설명인 (다)보다 앞에 두었습니다.",
+  "verbal-understanding":
+    "①~③은 이용 건수, 자전거 수, 대당 운행 횟수의 증감 방향을 모두 반대로 서술했고 ⑤는 요금을 낮췄다는 본문과 어긋납니다.",
+  "verbal-inference":
+    "①은 상담원 수가 같았다는 문장과, ②와 ④는 복잡한 상담 시간이 늘고 분쟁이 남아 있다는 문장과, ⑤는 해결 건수 15% 증가와 어긋납니다.",
+  "verbal-counterargument":
+    "①과 ⑤는 결론을 흔들지 않는 부수적 사실이고, ③은 전제를 되풀이한 문장이며, ④는 다른 회사 사례라 이 회사의 인과 해석과 무관합니다.",
+  "data-trend":
+    "①은 95에서 91로 줄어 어긋나고, ②는 82에서 79로 줄며, ④는 C 115 < D 184, ⑤는 4분기 338 > 1분기 301이라 모두 거짓입니다.",
+  "data-magnitude":
+    "①은 2025년 최댓값이 B의 10,120건이고, ③은 A 19,360 < E 19,670이며, ④는 10,000건 이상이 B와 D 두 곳, ⑤는 감소한 부서가 C와 E 두 곳입니다.",
+  "data-simple-sum":
+    "①은 A가 103이라 100이 아니고, ③은 C의 47+52=99, ④는 D 171 > C 163, ⑤는 E의 2분기 70 < 39×2=78입니다.",
+  "data-easy-rate":
+    "①은 25%를 20%로 봤고, ②는 B가 180에서 216으로 20%이며, ④는 C의 달성률이 264÷250=105.6%, ⑤는 D 40% > E 10%입니다.",
+  "data-easy-chain":
+    "①은 절반의 20%를 5%로 봤고, ③은 기술직 B등급이 1,000명의 35%인 350명, ④는 600÷1,000=60%, ⑤는 영업직이 400명입니다.",
+  "data-share-rate":
+    "①은 30%를 20%로 봤고, ②는 B가 360÷800=45%이며, ④는 C와 D의 합이 200÷800=25%, ⑤는 비용 비중 75% 이상이 A와 C 두 곳입니다.",
+  "data-average":
+    "①은 100을 90으로 봤고, ②는 처리율 최고가 D(110÷121)이며, ④는 차이가 가장 큰 곳이 C의 18건, ⑤는 평균 이상인 지점이 C, D, E 세 곳입니다.",
+  "data-derived-value":
+    "①은 350명이면 30%가 105명이 되어 맞지 않고, ②는 35%인 175명, ③은 20%인 100명, ⑤는 10%와 5%를 더한 75명입니다.",
+  "data-multi-calculation":
+    "ㄱ은 1구간 20억 원이 2구간 30억 원보다 작아 거짓이므로 ㄱ이 든 ①과 ④가 지워지고, ②와 ③은 참인 ㄴ과 ㄷ 가운데 하나만 골라 ‘모두 고른 것’이 되지 못합니다.",
+  "math-concentration-mix":
+    "20% 용액이 200g이면 혼합 농도가 40%, 300g이면 35%로 30%를 넘고, 450g이면 27.5%, 500g이면 25%로 30%에 못 미칩니다.",
+  "math-concentration-add":
+    "소금 60g은 그대로이고 전체만 600g이 되므로 8%와 9%는 소금이 모자라고, 11%와 12%는 물을 넣기 전 농도와 같거나 높아 성립하지 않습니다.",
+  "math-concentration-ratio":
+    "25%는 10%와 40%에서 각각 15%p 떨어져 있으므로, 한쪽을 두 배 이상 넣는 ②~⑤는 모두 25%를 벗어납니다.",
+  "math-population-equation":
+    "A가 80명이면 조정 후 합이 184명, 90명이면 187명, 110명이면 193명, 120명이면 196명이 되어 190명과 맞지 않습니다.",
+  "math-population-multiple":
+    "91, 101, 106, 111은 6으로 나누어떨어지지 않아 20% 늘리기 전 인원이 자연수가 되지 않습니다.",
+  "math-price-profit":
+    "9만 원은 이익률 12.5%, 9만5천 원은 18.75%, 10만5천 원은 31.25%, 11만 원은 37.5%로 모두 25%가 아닙니다.",
+  "math-count-sum-product":
+    "10과 12는 이동 방법 5가지나 메뉴 4가지 중 하나를 잘못 셌고, 16은 4×4, 24는 6×4로 실제 5×4와 다릅니다.",
+  "math-count-factorial":
+    "24는 네 명만 세운 4!, 60은 120의 절반, 240은 두 배이며 100은 어떤 배열 수도 아닙니다.",
+  "math-count-permutation":
+    "10은 순서를 구분하지 않은 5C2이고, 25는 한 사람이 두 직책을 겸할 때의 5²이며 15와 30은 어느 식에도 대응하지 않습니다.",
+  "math-count-combination":
+    "20은 순서를 구분한 5P2이고, 5는 한 명만 뽑는 경우이며 8과 15는 5C2와 맞지 않습니다.",
+  "math-count-bundle":
+    "24는 제한이 없는 전체 배열 4!이고, 나머지는 묶음을 배열하는 3!=6에 내부 순서 2를 곱한 12와 다릅니다.",
+  "math-count-separated":
+    "전체 24가지에서 이웃하는 12가지를 빼야 하므로, 8과 10과 14와 16은 두 값 중 하나를 잘못 센 결과입니다.",
+  "math-count-group":
+    "20은 조의 순서 중복을 2로 나누지 않은 6C3이고 40은 그 두 배이며, 5와 15는 6C3과 맞지 않습니다.",
+  "math-count-select":
+    "전체 5C2=10에서 A와 B가 모두 빠지는 3C2=3을 빼야 하므로, 3 대신 다른 수를 빼거나 더한 5, 6, 8, 9는 조건을 만족하지 않습니다.",
+  "math-count-circle":
+    "120은 회전 중복을 없애지 않은 5!이고 60은 그 절반이며, 12와 20은 4!=24와 맞지 않습니다.",
+  "math-probability-basic":
+    "1/4은 두 번 모두 불합격할 확률이고 1/2은 한 번만 검사할 때의 확률이며, 1/3과 2/3은 각 검사 확률 1/2에서 나올 수 없는 값입니다.",
+  "math-probability-conditional":
+    "1/2은 전체 여섯 눈에서 4 이상인 세 개를 센 값이고, 1/3은 짝수이면서 4 이상인 두 개를 여섯으로 나눈 값이며, 3/4과 5/6은 표본공간을 {2, 4, 6}으로 좁히지 않은 결과입니다.",
+  "math-distance-same":
+    "거리 120km는 그대로이므로 속력이 60에서 80으로 오르면 시간은 2시간보다 짧아야 하고, 1시간은 시속 120km일 때의 값입니다.",
+  "math-distance-train":
+    "12초는 터널 300m만, 8초는 기차 200m만 계산한 값이고 16초와 25초는 500÷25와 맞지 않습니다.",
+  "math-distance-relative":
+    "0.5시간이면 60km만 좁혀지고, 1.5시간이 넘으면 두 차량이 이미 지나쳐 120km를 넘습니다.",
+  "math-work-single":
+    "⑤ 8은 작업량이 아니라 걸린 날수이고, 1/4과 1/6과 1/10은 각각 4일, 6일, 10일이 걸릴 때의 하루 작업량입니다.",
+  "math-work-together":
+    "1일이면 하루 작업량이 1이어야 하고, 3일 이상은 두 사람의 합인 1/2보다 느린 속도라 조건과 맞지 않습니다.",
+  "math-work-partial":
+    "B는 2일 동안 남은 2/6을 처리해야 하므로, 1/8과 1/4과 1/3과 1/2은 이틀치 작업량이 2/6과 달라집니다.",
+  "math-work-capacity":
+    "A가 5개면 합계가 15개, 12개면 36개, 15개면 45개, 20개면 60개가 되어 30개와 맞지 않습니다.",
+  "math-age":
+    "자녀가 5세면 5년 후 어머니 나이가 자녀의 5배가 되고, 12세와 15세와 20세면 3배에 못 미칩니다.",
+  "math-shortage-surplus":
+    "14개와 16개는 다섯 명씩 앉힐 때 남는 의자가 1개뿐이고, 20개와 22개는 마지막 의자를 다섯 명으로 채우지 못합니다.",
+  "logic-conclusion-blank":
+    "①은 포함 관계를 거꾸로 뒤집었고 ②는 두 전제와 정면으로 어긋나며, ④와 ⑤의 기획자는 전제에 등장하지 않습니다.",
+  "logic-premise-small":
+    "②와 ④는 화살표 방향이 반대라 앱 제작자에 대한 결론을 만들지 못하고, ③은 일부만 말해 모든 앱 제작자를 보장하지 못하며 ⑤는 아무 관계도 세우지 않습니다.",
+  "logic-premise-large":
+    "①은 방향이 반대이고 ③과 ④는 일부에 대한 진술이라 모든 기자를 보장하지 못하며 ⑤는 관계를 끊습니다.",
+  "logic-chain":
+    "P가 참이므로 ①과 ④는 거짓이고, S와 T는 R이 아닐 때만 쓰는 조건이라 ③과 ⑤는 확정할 수 없습니다.",
+  "logic-some-amo":
+    "①은 어떤을 모든으로 넓혔고 ③은 존재하는 교집합과 어긋나며, ④는 방향이 반대이고 ⑤는 전제 1을 부정합니다.",
+  "logic-some-mmo": "②와 ④는 포함 방향을 뒤집었고, ③과 ⑤는 전제 2, 3과 정면으로 어긋납니다.",
+  "logic-linear":
+    "D는 항상 첫 번째, C는 항상 다섯 번째이므로 ③과 ④가 제외되고, A와 E는 두 번째와 세 번째를 나눠 가지므로 네 번째가 될 수 없습니다.",
+  "logic-item":
+    "E는 월요일, C는 금요일로 고정되고 A는 수요일에 올 수 없으므로 D와 A가 수요일과 목요일을 차지하며 남은 B는 화요일입니다.",
   "logic-number":
-    "가능한 배정이 하나로 결정될 때까지 이미 사용된 숫자와 아직 남은 숫자를 구분한다.",
+    "C가 1, D가 5를 받으므로 ①과 ⑤가 제외되고, 남은 2, 3, 4 가운데 A가 B보다 크면서 합이 7이 되려면 A는 4, B는 3이어야 하므로 ②와 ④도 성립하지 않습니다.",
+  "logic-truth":
+    "A와 D는 같은 진술을 해서 함께 거짓일 수 없으므로 ①과 ④가 제외되고, C가 거짓이면 B의 말이 참이 되어 거짓말쟁이가 두 명이 되므로 ③도 성립하지 않습니다. 배치가 하나로 정해지므로 ⑤도 답이 아닙니다.",
+  "sequence-arithmetic":
+    "공차가 7이므로 52 다음은 59입니다. 57과 58은 공차를 5나 6으로, 60과 61은 8이나 9로 본 값입니다.",
+  "sequence-geometric":
+    "48 다음이 96, 192, 384이므로 192는 일곱 번째 항이고 768은 아홉 번째 항이며, 256과 512는 3에서 출발한 등비수열에 없는 값입니다.",
+  "sequence-difference":
+    "A는 17+9=26, B는 37+13=50이므로 합은 76이고, 나머지는 차이 11과 13 가운데 하나를 잘못 적용한 값입니다.",
+  "sequence-power":
+    "각 항은 제곱수에서 1을 뺀 값이므로 다음은 6²−1=35입니다. 36은 1을 빼지 않은 6²이고 30과 32와 40은 제곱수와 어긋납니다.",
+  "sequence-factorial":
+    "곱하는 수가 2, 3, 4로 커졌으므로 다음은 24×5입니다. 96은 ×4, 240은 ×10을 적용한 값이고 60과 144는 어느 단계와도 맞지 않습니다.",
+  "sequence-fibonacci":
+    "앞의 두 항 8과 13을 더하면 21이므로, 20과 22는 한 항을 잘못 읽은 값이고 18과 19는 어떤 두 항의 합도 아닙니다.",
+  "sequence-mixed":
+    "규칙이 ×2+1이므로 23×2+1=47입니다. 45는 더하기를 빠뜨린 값이고 49는 +3을 적용한 값입니다.",
+  "sequence-fraction":
+    "A는 5/6, B는 6/7이므로 A÷B는 (5×7)/(6×6)=35/36이고, 36/35는 나누는 방향을 반대로 잡은 값입니다.",
+  "sequence-decimal":
+    "비율이 3이므로 5.4×3=16.2입니다. 10.8은 ×2를 적용한 값이고 12.6과 14.2와 18.0은 3배 규칙과 맞지 않습니다.",
 };
 
 const CASE_PASSAGE_OVERRIDES: Partial<Record<string, string>> = {
@@ -984,16 +1122,19 @@ const stepNarrations = (
   tip: string,
   reasoning: string,
   answer: number,
+  elimination: string,
+  caution?: string,
 ) => {
   const answerSentence = `정답은 ${markers[answer]}입니다.`;
+  const strategy = caution ? `${tip} ${caution}` : tip;
 
   if (categoryId === "verbal-comprehension") {
     return [
       `발문에서 요구하는 판단 기준을 확인합니다. ${description}`,
       `지문에서 정답 판단에 필요한 핵심 근거를 찾습니다. ${clue}`,
-      `근거 사이의 관계를 정리합니다. ${tip}`,
-      "후보 선지를 본문과 하나씩 대조해 근거가 부족하거나 범위가 달라진 선지를 제거합니다.",
-      `${reasoning} 나머지 선지는 본문의 핵심 내용이나 세부 근거와 일치하지 않습니다. ${answerSentence}`,
+      `근거 사이의 관계를 정리합니다. ${strategy}`,
+      `후보 선지를 본문과 하나씩 대조합니다. ${elimination}`,
+      `${reasoning} ${answerSentence}`,
     ];
   }
 
@@ -1001,9 +1142,9 @@ const stepNarrations = (
     return [
       `발문에서 요구하는 연도와 항목, 계산 기준을 확인합니다. ${description}`,
       `표나 그래프에서 필요한 값만 찾습니다. ${clue}`,
-      `필요한 비교나 계산을 가장 짧은 순서로 수행합니다. ${tip}`,
-      "비교하거나 계산한 결과를 후보 선지와 대조해 참과 거짓을 구분합니다.",
-      `${reasoning} 나머지 선지는 자료의 수치나 계산 결과와 일치하지 않습니다. ${answerSentence}`,
+      `필요한 비교나 계산을 가장 짧은 순서로 수행합니다. ${strategy}`,
+      `계산한 결과를 후보 선지와 대조합니다. ${elimination}`,
+      `${reasoning} ${answerSentence}`,
     ];
   }
 
@@ -1011,9 +1152,9 @@ const stepNarrations = (
     return [
       `구해야 하는 값과 주어진 수량을 구분합니다. ${description}`,
       `핵심 조건을 식으로 바꿉니다. ${clue}`,
-      `세운 식에 풀이 원칙을 적용합니다. ${tip}`,
-      "계산 결과를 선지와 대조하고 단위와 조건을 다시 확인합니다.",
-      `${reasoning} 나머지 선지는 계산 결과와 일치하지 않습니다. ${answerSentence}`,
+      `세운 식에 풀이 원칙을 적용합니다. ${strategy}`,
+      `계산 결과를 선지와 대조합니다. ${elimination}`,
+      `${reasoning} ${answerSentence}`,
     ];
   }
 
@@ -1021,18 +1162,18 @@ const stepNarrations = (
     return [
       `발문이 요구하는 대상과 판단 방향을 확인합니다. ${description}`,
       `명제나 조건을 짧게 정리합니다. ${clue}`,
-      `정리한 관계에 풀이 원칙을 적용합니다. ${tip}`,
-      "후보 선지를 조건에 대입해 모든 조건을 만족하는지 확인합니다.",
-      `${reasoning} 나머지 선지는 전제만으로 반드시 도출되지 않거나 조건을 만족하지 않습니다. ${answerSentence}`,
+      `정리한 관계에 풀이 원칙을 적용합니다. ${strategy}`,
+      `후보 선지를 조건에 대입합니다. ${elimination}`,
+      `${reasoning} ${answerSentence}`,
     ];
   }
 
   return [
     `발문에서 구해야 하는 항이나 연산 결과를 확인합니다. ${description}`,
     `인접한 항의 변화 규칙을 확인합니다. ${clue}`,
-    `찾은 규칙을 다음 항에도 같은 방식으로 적용합니다. ${tip}`,
-    "빈칸이나 목표 항을 계산해 선지와 대조합니다.",
-    `${reasoning} 나머지 선지는 같은 규칙을 끝까지 적용한 값과 일치하지 않습니다. ${answerSentence}`,
+    `찾은 규칙을 다음 항에도 같은 방식으로 적용합니다. ${strategy}`,
+    `계산한 값을 선지와 대조합니다. ${elimination}`,
+    `${reasoning} ${answerSentence}`,
   ];
 };
 
@@ -1046,12 +1187,14 @@ export const BOOK_TUTORIAL_PROBLEMS: Problem[] = CATEGORIES.flatMap((category) =
         ? item.passage.split("\n").slice(1).join("\n")
         : item.passage;
       const basePassage = CASE_PASSAGE_OVERRIDES[kind.id] ?? originalPassage;
-      const formatAdjustedPassage = category.id === "creative-math"
-        ? basePassage.split("\n").slice(0, 3).join("\n")
-        : basePassage;
-      const rawPassage = CASE_DETAILS[kind.id] && category.id !== "creative-math"
-        ? `${formatAdjustedPassage}\n${CASE_DETAILS[kind.id]}`
-        : formatAdjustedPassage;
+      const formatAdjustedPassage =
+        category.id === "creative-math"
+          ? basePassage.split("\n").slice(0, 3).join("\n")
+          : basePassage;
+      const rawPassage =
+        CASE_DETAILS[kind.id] && category.id !== "creative-math"
+          ? `${formatAdjustedPassage}\n${CASE_DETAILS[kind.id]}`
+          : formatAdjustedPassage;
       let passageIndex = 0;
       const passage = rawPassage.split("\n").flatMap((line) => {
         const chunks = insertion ? line.split(/(\([A-E]\))/) : line.split(/(?<=[.!?])\s+/);
@@ -1083,13 +1226,16 @@ export const BOOK_TUTORIAL_PROBLEMS: Problem[] = CATEGORIES.flatMap((category) =
       const decisionVisualIds = CASE_DECISION_VISUALS[kind.id] ?? visualIds;
       const comparisonChoiceIds = CASE_COMPARISON_CHOICES[kind.id];
       if (!comparisonChoiceIds) throw new Error(`Missing comparison choices: ${kind.id}`);
-      if (comparisonChoiceIds.length < 2) throw new Error(`Comparison needs multiple choices: ${kind.id}`);
+      if (comparisonChoiceIds.length < 2)
+        throw new Error(`Comparison needs multiple choices: ${kind.id}`);
       if (!comparisonChoiceIds.includes(String(item.answer + 1))) {
         throw new Error(`Comparison omits answer: ${kind.id}`);
       }
       if (comparisonChoiceIds.some((id) => Number(id) < 1 || Number(id) > item.choices.length)) {
         throw new Error(`Invalid comparison choice: ${kind.id}`);
       }
+      const elimination = CASE_ELIMINATIONS[kind.id];
+      if (!elimination) throw new Error(`Missing elimination note: ${kind.id}`);
       const narrations = stepNarrations(
         category.id,
         kind.description,
@@ -1097,12 +1243,16 @@ export const BOOK_TUTORIAL_PROBLEMS: Problem[] = CATEGORIES.flatMap((category) =
         kind.tip,
         item.reasoning,
         item.answer,
+        elimination,
+        CASE_CAUTIONS[kind.id],
       );
       return {
         id: kind.tutorialId,
         type: insertion
           ? "insertion"
-          : kind.id === "verbal-blank-single" || kind.id.startsWith("logic-premise") || kind.id === "logic-conclusion-blank"
+          : kind.id === "verbal-blank-single" ||
+              kind.id.startsWith("logic-premise") ||
+              kind.id === "logic-conclusion-blank"
             ? "single-blank"
             : "standard",
         internalTypeName: kind.name,
@@ -1110,9 +1260,7 @@ export const BOOK_TUTORIAL_PROBLEMS: Problem[] = CATEGORIES.flatMap((category) =
         typeSummary: kind.description,
         strategy: kind.tip,
         stem: item.stem,
-        box: insertion
-          ? item.passage.split("\n")[0].replace("보기: ", "")
-          : CASE_BOXES[kind.id],
+        box: insertion ? item.passage.split("\n")[0].replace("보기: ", "") : CASE_BOXES[kind.id],
         passageLabel: ["logic-linear", "logic-item", "logic-number"].includes(kind.id)
           ? "조건"
           : undefined,

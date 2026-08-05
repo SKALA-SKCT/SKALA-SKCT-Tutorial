@@ -6,17 +6,61 @@ type Draft = Omit<ExampleQuestion, "id" | "categoryId" | "kindId" | "typeLabel">
 const markers = ["①", "②", "③", "④", "⑤"];
 const comma = (value: number) => value.toLocaleString("ko-KR");
 const roundedDecimal = (value: number) => String(Math.round(value * 10000) / 10000);
-const hasBatchim = (text: string) => {
+const finalCode = (text: string) => {
   const code = text.charCodeAt(text.length - 1) - 0xac00;
-  return code >= 0 && code <= 11171 && code % 28 !== 0;
+  return code >= 0 && code <= 11171 ? code % 28 : -1;
 };
+const hasBatchim = (text: string) => finalCode(text) > 0;
 const topic = (text: string) => `${text}${hasBatchim(text) ? "은" : "는"}`;
 const subject = (text: string) => `${text}${hasBatchim(text) ? "이" : "가"}`;
 const object = (text: string) => `${text}${hasBatchim(text) ? "을" : "를"}`;
 const withAnd = (text: string) => `${text}${hasBatchim(text) ? "과" : "와"}`;
+/** 받침이 없거나 ㄹ 받침이면 "로", 그 외에는 "으로". */
+const withRo = (text: string) => {
+  const code = finalCode(text);
+  return `${text}${code === 0 || code === 8 || code === -1 ? "로" : "으로"}`;
+};
+/** 숫자를 한국어로 읽었을 때의 끝소리. 0=받침 없음, 1=ㄹ 받침, 2=그 밖의 받침 */
+const numberFinal = (value: number) => {
+  const last = Math.abs(Math.round(value)) % 10;
+  if (last !== 0) return [0, 1, 0, 2, 0, 0, 2, 1, 1, 0][last];
+  const absolute = Math.abs(Math.round(value));
+  if (absolute === 0) return 0;
+  if (absolute % 100 !== 0) return 2; // 십
+  if (absolute % 1000 !== 0) return 2; // 백
+  return 0; // 천, 만
+};
+/** "30이었고" / "32였고" 처럼 숫자 뒤 서술격 조사를 맞춘다. */
+const numberWas = (value: number) => `${comma(value)}${numberFinal(value) === 0 ? "였" : "이었"}`;
+/** "25로" / "33으로" 처럼 숫자 뒤 부사격 조사를 맞춘다. */
+const numberTo = (value: number) => `${comma(value)}${numberFinal(value) === 2 ? "으로" : "로"}`;
+const numberSubject = (value: number) => `${comma(value)}${numberFinal(value) === 0 ? "가" : "이"}`;
+const numberObject = (value: number) => `${comma(value)}${numberFinal(value) === 0 ? "를" : "을"}`;
+const numberAnd = (value: number) => `${comma(value)}${numberFinal(value) === 0 ? "와" : "과"}`;
+
+/**
+ * 세부 유형마다 정답 위치 20개를 미리 섞어 둔다.
+ * 정답 번호가 문항 순서와 무관해지고, 다섯 위치에 정확히 4번씩 배분된다.
+ */
+const slotPlanCache = new Map<string, number[]>();
+const slotPlan = (kindId: string) => {
+  const cached = slotPlanCache.get(kindId);
+  if (cached) return cached;
+  const slots = Array.from({ length: 20 }, (_, i) => i % 5);
+  let seed = [...kindId].reduce((value, char) => (value * 31 + char.charCodeAt(0)) >>> 0, 7);
+  for (let i = slots.length - 1; i > 0; i--) {
+    seed = (seed * 1103515245 + 12345) >>> 0;
+    const j = seed % (i + 1);
+    [slots[i], slots[j]] = [slots[j], slots[i]];
+  }
+  slotPlanCache.set(kindId, slots);
+  return slots;
+};
+let activeSlots = slotPlan("default");
+const slotFor = (index: number) => activeSlots[index % activeSlots.length];
 
 function choicesWithAnswer(correct: string, wrong: string[], index: number) {
-  const answer = index % 5;
+  const answer = slotFor(index);
   const fallback = [
     "조건만으로 구할 수 없다",
     "제시된 값 중에는 없다",
@@ -31,9 +75,70 @@ function choicesWithAnswer(correct: string, wrong: string[], index: number) {
   return { choices, answer };
 }
 
+/**
+ * 수치형 선지는 실제 시험처럼 오름차순으로 배열하고,
+ * 정답이 놓일 순위만 유형별 배치 계획에서 가져온다.
+ */
 function numberChoices(value: number, gap: number, index: number, suffix = "") {
-  const wrong = [-2, -1, 1, 2].map((offset) => `${comma(value + gap * offset)}${suffix}`);
-  return choicesWithAnswer(`${comma(value)}${suffix}`, wrong, index);
+  const answer = slotFor(index);
+  const room = answer > 0 ? (value * 0.9) / answer : gap;
+  const step = Number.isInteger(gap)
+    ? Math.max(1, Math.min(gap, Math.floor(room)))
+    : Math.min(gap, room);
+  const offsets = [
+    ...Array.from({ length: answer }, (_, i) => i - answer),
+    0,
+    ...Array.from({ length: 4 - answer }, (_, i) => i + 1),
+  ];
+  return { choices: offsets.map((o) => `${comma(value + step * o)}${suffix}`), answer };
+}
+
+/**
+ * 값이 있는 선지를 오름차순으로 배열하되, 정답보다 작은 오답을 몇 개 둘지를
+ * 배치 계획에서 가져와 정답의 순위가 한 자리에 고정되지 않게 한다.
+ */
+interface ValueChoice {
+  value: number;
+  text: string;
+}
+function rankedChoices(correct: ValueChoice, pool: ValueChoice[], index: number) {
+  const slot = slotFor(index);
+  const seen = new Set([correct.text]);
+  const unique = pool.filter((item) => {
+    if (seen.has(item.text) || Math.abs(item.value - correct.value) < 1e-9) return false;
+    seen.add(item.text);
+    return true;
+  });
+  const below = unique
+    .filter((item) => item.value < correct.value)
+    .sort((a, b) => b.value - a.value);
+  const above = unique
+    .filter((item) => item.value > correct.value)
+    .sort((a, b) => a.value - b.value);
+  const take = Math.max(Math.min(slot, below.length), 4 - above.length);
+  const picked = [...below.slice(0, take), ...above.slice(0, 4 - take), correct].sort(
+    (a, b) => a.value - b.value,
+  );
+  return { choices: picked.map((item) => item.text), answer: picked.indexOf(correct) };
+}
+
+const numericValue = (choice: string) => {
+  const match = choice
+    .replaceAll(",", "")
+    .match(/^(-?\d+(?:\.\d+)?)(?:\/(-?\d+(?:\.\d+)?))?(?:%|시간|일|초|분|명|개|건|g|세|가지|원)?$/);
+  return match ? Number(match[1]) / (match[2] ? Number(match[2]) : 1) : null;
+};
+
+/** 값으로 비교할 수 있는 선지는 오름차순으로 정렬한다. */
+function sortNumericChoices(draft: Draft): Draft {
+  const values = draft.choices.map(numericValue);
+  if (values.some((value) => value === null)) return draft;
+  const correct = draft.choices[draft.answer];
+  const choices = draft.choices
+    .map((choice, i) => ({ choice, value: values[i] as number }))
+    .sort((a, b) => a.value - b.value)
+    .map((item) => item.choice);
+  return { ...draft, choices, answer: choices.indexOf(correct) };
 }
 
 const subjects = [
@@ -43,6 +148,7 @@ const subjects = [
     "시설 수",
     "혼잡 시간에 운영 인력을 재배치",
     "대기 시간이 줄었다",
+    "같은 기간에 인근 공사가 끝나 시설로 들어오는 동선이 원활해졌다",
   ],
   [
     "지역 도서관",
@@ -50,6 +156,7 @@ const subjects = [
     "보유 도서 수",
     "학습 공간과 협업 공간을 분리",
     "소음 민원이 감소했다",
+    "같은 기간에 시험 기간이 끝나 저녁 이용자 수가 크게 줄었다",
   ],
   [
     "공유 우산 서비스",
@@ -57,6 +164,7 @@ const subjects = [
     "대여소 수",
     "날씨와 이동 경로에 맞춰 우산을 재배치",
     "품절 시간이 짧아졌다",
+    "같은 기간에 강수일이 크게 줄어 우산 대여 수요가 감소했다",
   ],
   [
     "산업 안전 교육",
@@ -64,6 +172,7 @@ const subjects = [
     "교육 횟수",
     "위험 공정에 실습 시간을 집중",
     "초기 대응 속도가 빨라졌다",
+    "같은 기간에 공장 비상 알림 시스템이 새 장비로 교체됐다",
   ],
   [
     "학교 급식",
@@ -71,6 +180,7 @@ const subjects = [
     "메뉴 가짓수",
     "잔반 원인을 반영해 배식량을 조절",
     "식재료 폐기가 감소했다",
+    "같은 기간에 급식 이용 학생 수가 크게 감소했다",
   ],
   [
     "도심 배송",
@@ -78,6 +188,7 @@ const subjects = [
     "배송 차량 수",
     "주문 밀도에 따라 출발 거점을 조정",
     "평균 배송 시간이 줄었다",
+    "같은 기간에 전체 주문량이 크게 감소했다",
   ],
   [
     "하천 산책로",
@@ -85,6 +196,7 @@ const subjects = [
     "벤치 수",
     "이용 시간과 그늘 위치에 맞춰 휴식 시설을 이동",
     "낮 시간 이용률이 높아졌다",
+    "같은 기간에 산책로 진입로를 막던 공사가 끝났다",
   ],
   [
     "고객 상담",
@@ -92,6 +204,7 @@ const subjects = [
     "상담 인원",
     "반복 문의를 자동 분류하고 복합 문의를 전담 배정",
     "첫 답변 시간이 짧아졌다",
+    "같은 기간에 전체 고객 문의 건수가 크게 감소했다",
   ],
   [
     "사내 회의",
@@ -99,6 +212,7 @@ const subjects = [
     "회의 횟수",
     "결정 담당자와 기한을 회의 전에 지정",
     "미완료 안건이 감소했다",
+    "같은 기간에 회의당 안건 수가 절반으로 줄었다",
   ],
   [
     "전기차 충전소",
@@ -106,6 +220,7 @@ const subjects = [
     "충전기 수",
     "회전율이 낮은 지점의 장비를 수요 지점으로 이전",
     "대기 차량이 줄었다",
+    "같은 기간에 해당 권역의 전기차 충전 수요가 크게 감소했다",
   ],
   [
     "박물관 안내",
@@ -113,6 +228,7 @@ const subjects = [
     "안내판 수",
     "갈림길 중심으로 안내 정보를 재배치",
     "길 찾기 문의가 감소했다",
+    "같은 기간에 박물관 전체 방문객 수가 크게 감소했다",
   ],
   [
     "재활용 수거",
@@ -120,6 +236,7 @@ const subjects = [
     "수거함 수",
     "배출량에 따라 수거 주기를 다르게 적용",
     "넘침 신고가 줄었다",
+    "같은 기간에 재활용품 총배출량이 크게 감소했다",
   ],
   [
     "원격 진료 예약",
@@ -127,6 +244,7 @@ const subjects = [
     "예약 가능 인원",
     "취소 가능성이 높은 시간에 대기 명단을 연동",
     "빈 진료 시간이 감소했다",
+    "같은 기간에 전체 진료 예약 수요가 크게 증가했다",
   ],
   [
     "공장 설비 점검",
@@ -134,6 +252,7 @@ const subjects = [
     "정기 점검 횟수",
     "전조가 나타난 장비를 우선 점검",
     "갑작스러운 정지가 줄었다",
+    "같은 기간에 고장이 잦던 노후 장비가 새 장비로 교체됐다",
   ],
   [
     "문화 강좌",
@@ -141,6 +260,7 @@ const subjects = [
     "개설 과정 수",
     "이탈이 많은 차시에 보충 활동을 배치",
     "수료율이 높아졌다",
+    "같은 기간에 교육 수료자에게 인사 평가 가점을 주는 제도가 도입됐다",
   ],
   [
     "농산물 보관",
@@ -148,6 +268,7 @@ const subjects = [
     "창고 면적",
     "품목별 적정 온도로 보관 구역을 분리",
     "폐기 비율이 감소했다",
+    "같은 기간에 입고 농산물의 초기 품질 기준이 강화됐다",
   ],
   [
     "통근 버스",
@@ -155,6 +276,7 @@ const subjects = [
     "운행 횟수",
     "혼잡 노선의 정차 순서와 배차를 조정",
     "정시 도착률이 높아졌다",
+    "같은 기간에 노선 주변의 장기 도로 공사가 끝났다",
   ],
   [
     "온라인 교육",
@@ -162,6 +284,7 @@ const subjects = [
     "영상 길이",
     "중단이 많은 구간에 짧은 확인 문제를 배치",
     "완강률이 높아졌다",
+    "같은 기간에 교육 이수자에게 자격 수당을 지급하기 시작했다",
   ],
   [
     "보행 신호",
@@ -169,6 +292,7 @@ const subjects = [
     "신호등 수",
     "시간대별 보행량에 따라 신호 시간을 조절",
     "무단 횡단이 줄었다",
+    "같은 기간에 해당 교차로의 무단 횡단 단속이 강화됐다",
   ],
   [
     "사내 문서 검색",
@@ -176,6 +300,7 @@ const subjects = [
     "문서 수",
     "동의어와 최신 문서 가중치를 검색에 반영",
     "재검색 횟수가 감소했다",
+    "같은 기간에 전 직원을 대상으로 문서 검색 교육을 실시했다",
   ],
 ] as const;
 
@@ -249,11 +374,11 @@ const probabilityScenarios = [
 ] as const;
 
 function verbalSource(index: number) {
-  const [subject, evidence, oldMetric, action, result] = subjects[index];
+  const [subject, evidence, oldMetric, action, result, alternativeCause] = subjects[index];
   const before = 30 + index;
   const after = before - (5 + (index % 4));
-  const passage = `${subject} 운영자는 초기 성과를 ${oldMetric}로만 판단했다. 그러나 이용자가 체감하는 불편은 수량이 늘어난 뒤에도 계속됐다. 운영자는 ${object(evidence)} 조사해 불편이 특정 조건에 집중된다는 사실을 확인했다. 이에 ${action}했다. 조정 전 평균 불편 지수는 ${before}였고 조정 후에는 ${after}로 낮아졌다. 이 사례는 투입 규모보다 이용 과정에서 얻은 근거를 운영 결정에 반영하는 일이 중요함을 보여준다.`;
-  return { subject, evidence, oldMetric, action, result, before, after, passage };
+  const passage = `${subject} 운영자는 초기 성과를 ${withRo(oldMetric)}만 판단했다. 그러나 이용자가 체감하는 불편은 수량이 늘어난 뒤에도 계속됐다. 운영자는 ${object(evidence)} 조사해 불편이 특정 조건에 집중된다는 사실을 확인했다. 이에 ${action}했다. 조정 전 평균 불편 지수는 ${numberWas(before)}고 조정 후에는 ${numberTo(after)} 낮아졌다. 이 사례는 투입 규모보다 이용 과정에서 얻은 근거를 운영 결정에 반영하는 일이 중요함을 보여준다.`;
+  return { subject, evidence, oldMetric, action, result, alternativeCause, before, after, passage };
 }
 
 function verbalQuestion(kindId: string, index: number): Draft {
@@ -272,18 +397,18 @@ function verbalQuestion(kindId: string, index: number): Draft {
       stem: "다음 글의 주제로 가장 적절한 것은?",
       passage: s.passage,
       ...c,
-      explanation: `글은 ${object(s.evidence)} 근거로 운영 방식을 바꾸고 불편을 줄인 과정을 설명하므로 ${correct}이 중심 내용입니다.`,
+      explanation: `글은 ${object(s.evidence)} 근거로 운영 방식을 바꾸고 불편을 줄인 과정을 설명하므로 ${subject(correct)} 중심 내용입니다.`,
     };
   }
   if (kindId === "verbal-blank-single") {
     const passage = `${s.passage.split(". ").slice(0, 5).join(". ")}. 따라서 효과적인 운영은 투입량보다 ______에 가까워야 한다.`;
-    const correct = "이용 근거에 따른 지속적인 조정";
+    const correct = `${s.evidence}에서 확인한 조건에 맞춘 조정`;
     const c = choicesWithAnswer(
       correct,
       [
-        "일률적인 수량 확대",
-        "조사 없는 즉시 결정",
-        "기존 방식의 무조건 유지",
+        `${s.oldMetric}의 일률적인 확대`,
+        "조사 없이 내리는 즉시 결정",
+        "기존 운영 방식의 무조건 유지",
         "성과 측정의 전면 중단",
       ],
       index,
@@ -296,18 +421,29 @@ function verbalQuestion(kindId: string, index: number): Draft {
     };
   }
   if (kindId === "verbal-blank-position") {
-    const target = index % 5;
+    const target = slotFor(index);
     const positions = ["(A)", "(B)", "(C)", "(D)", "(E)"];
-    const before = `${s.subject} 운영자는 ${s.oldMetric}가 늘면 서비스 품질도 자연스럽게 높아질 것으로 기대했다.`;
+    const before = `${s.subject} 운영자는 ${subject(s.oldMetric)} 늘면 서비스 품질도 자연스럽게 높아질 것으로 기대했다.`;
     const after = `실제로는 ${s.evidence}에 따라 불편이 집중되는 조건이 달랐다.`;
-    const fillers = [
-      `${topic(s.subject)} 여러 지역에서 이용되고 있다.`,
-      `운영자는 매달 시설 현황을 공개했다.`,
-      `${s.action}하는 방안도 검토했다.`,
-      `조정 뒤에는 ${s.result}.`,
+    // 배경 → 기대(보기가 반전하는 지점) → 실제 → 결과 순서라야 어느 위치에서 끊어도 흐름이 유지된다.
+    const background = [
+      `${topic(s.subject)} 최근 몇 년 사이 이용이 꾸준히 늘었다.`,
+      `운영자는 이용자 수와 ${object(s.oldMetric)} 매달 집계해 공개해 왔다.`,
+      `초기 개선안은 대부분 ${object(s.oldMetric)} 늘리는 데 집중됐다.`,
+      `예산이 확보될 때마다 같은 방식의 확충이 이어졌다.`,
     ];
-    const sentences = [...fillers];
-    sentences.splice(target, 0, before, after);
+    const consequence = [
+      `이후 운영자는 ${object(s.evidence)} 조사해 불편이 집중되는 조건을 확인했다.`,
+      `조사 결과를 바탕으로 ${s.action}했다.`,
+      `조정 뒤에는 ${s.result}.`,
+      `운영자는 같은 방식으로 다음 개선 과제를 정하기로 했다.`,
+    ];
+    const sentences = [
+      ...background.slice(0, target),
+      before,
+      after,
+      ...consequence.slice(0, 4 - target),
+    ];
     const passage =
       sentences
         .slice(0, 5)
@@ -319,7 +455,7 @@ function verbalQuestion(kindId: string, index: number): Draft {
       box: "그러나 투입 규모가 커진다고 해서 이용자의 불편이 항상 줄어드는 것은 아니다.",
       choices: positions,
       answer: target,
-      explanation: `보기의 ‘그러나’는 투입 확대에 대한 기대를 반전하고 실제 이용 조건의 차이로 이어지므로 ${positions[target]}가 적절합니다.`,
+      explanation: `보기의 ‘그러나’는 투입 확대에 대한 기대를 반전하고 실제 이용 조건의 차이로 이어지므로 ${positions[target]} 위치가 적절합니다.`,
     };
   }
   if (kindId === "verbal-match-predicate") {
@@ -329,8 +465,8 @@ function verbalQuestion(kindId: string, index: number): Draft {
       [
         `운영자는 ${object(s.evidence)} 조사했다`,
         `${s.action}했다`,
-        `조정 전 불편 지수는 ${s.before}였다`,
-        `조정 뒤 불편 지수는 ${s.after}였다`,
+        `조정 전 불편 지수는 ${numberWas(s.before)}다`,
+        `조정 뒤 불편 지수는 ${numberWas(s.after)}다`,
       ],
       index,
     );
@@ -338,18 +474,18 @@ function verbalQuestion(kindId: string, index: number): Draft {
       stem: "다음 글의 내용과 일치하지 않는 것은?",
       passage: s.passage,
       ...c,
-      explanation: `불편 지수는 ${s.before}에서 ${s.after}로 낮아졌으므로 높아졌다는 선지가 본문과 일치하지 않습니다.`,
+      explanation: `불편 지수는 ${s.before}에서 ${numberTo(s.after)} 낮아졌으므로 높아졌다는 선지가 본문과 일치하지 않습니다.`,
     };
   }
   if (kindId === "verbal-match-range") {
-    const correct = `조정 전 평균 불편 지수는 ${s.before}였다`;
+    const correct = `조정 전 평균 불편 지수는 ${numberWas(s.before)}다`;
     const c = choicesWithAnswer(
       correct,
       [
-        `조정 전 지수는 ${s.after}였다`,
-        `조정 후 지수는 ${s.before}였다`,
+        `조정 전 지수는 ${numberWas(s.after)}다`,
+        `조정 후 지수는 ${numberWas(s.before)}다`,
         `모든 이용자의 불편이 완전히 사라졌다`,
-        `${s.oldMetric}는 감소했다는 수치가 제시됐다`,
+        `${topic(s.oldMetric)} 감소했다는 수치가 제시됐다`,
       ],
       index,
     );
@@ -357,7 +493,7 @@ function verbalQuestion(kindId: string, index: number): Draft {
       stem: "다음 글의 내용과 일치하는 것은?",
       passage: s.passage,
       ...c,
-      explanation: `본문에 조정 전 평균 불편 지수가 ${s.before}이라고 직접 제시되어 있습니다.`,
+      explanation: `본문은 조정 전 평균 불편 지수를 ${numberTo(s.before)} 직접 제시합니다.`,
     };
   }
   if (kindId === "verbal-match-order") {
@@ -366,7 +502,7 @@ function verbalQuestion(kindId: string, index: number): Draft {
       correct,
       [
         `${object(s.evidence)} 조사한 뒤 운영 방식을 조정했다`,
-        `초기에는 ${s.oldMetric}로 성과를 판단했다`,
+        `초기에는 ${withRo(s.oldMetric)} 성과를 판단했다`,
         `운영 조정 뒤 지표를 다시 측정했다`,
         `수량 확대 뒤에도 불편이 이어졌다`,
       ],
@@ -399,29 +535,51 @@ function verbalQuestion(kindId: string, index: number): Draft {
     };
   }
   if (kindId === "verbal-paragraph-order") {
-    const parts = [
-      `(가) 그 결과 ${s.result}.`,
-      `(나) ${s.subject} 운영자는 기존 방식으로 이용자 불편을 해결하기 어렵다고 판단했다.`,
-      `(다) 조사 결과를 바탕으로 ${s.action}했다.`,
-      `(라) 먼저 ${object(s.evidence)} 조사해 불편이 집중되는 조건을 확인했다.`,
+    // 내용 순서는 문제 인식 → 조사 → 조정 → 결과로 고정하고, 문단 기호만 유형별로 다르게 붙인다.
+    const contents = [
+      `${s.subject} 운영자는 기존 방식으로 이용자 불편을 해결하기 어렵다고 판단했다.`,
+      `먼저 ${object(s.evidence)} 조사해 불편이 집중되는 조건을 확인했다.`,
+      `조사 결과를 바탕으로 ${s.action}했다.`,
+      `그 결과 ${s.result}.`,
     ];
-    const passage = parts.join("\n");
-    const correct = "나, 라, 다, 가";
-    const c = choicesWithAnswer(
-      correct,
-      ["가, 나, 라, 다", "나, 다, 라, 가", "라, 나, 다, 가", "나, 라, 가, 다"],
-      index,
-    );
+    const labelOrders = [
+      ["나", "라", "다", "가"],
+      ["다", "가", "라", "나"],
+      ["라", "다", "가", "나"],
+      ["가", "다", "나", "라"],
+      ["나", "가", "라", "다"],
+    ];
+    const labels = labelOrders[index % labelOrders.length];
+    const marks = ["가", "나", "다", "라"];
+    const passage = marks.map((mark) => `(${mark}) ${contents[labels.indexOf(mark)]}`).join("\n");
+    const correct = labels.join(", ");
+    const wrong = [
+      [labels[1], labels[0], labels[2], labels[3]].join(", "),
+      [labels[0], labels[2], labels[1], labels[3]].join(", "),
+      [labels[0], labels[1], labels[3], labels[2]].join(", "),
+      [labels[3], labels[0], labels[1], labels[2]].join(", "),
+    ];
+    const c = choicesWithAnswer(correct, wrong, index);
     return {
       stem: "다음 글의 (가)~(라)를 문맥에 맞게 순서대로 배열한 것은?",
       passage,
       ...c,
-      explanation: `문제 인식인 (나), 조사인 (라), 조정인 (다), 결과인 (가)의 순서가 자연스럽습니다.`,
+      explanation: `문제 인식인 (${labels[0]}), 조사인 (${labels[1]}), 조정인 (${labels[2]}), 결과인 (${labels[3]})의 순서가 자연스럽습니다.`,
     };
   }
   if (kindId === "verbal-understanding") {
-    const correct = `운영자는 투입량보다 이용 조건을 반영하는 방향으로 방식을 바꿨다`;
-    const c = choicesWithAnswer(correct, commonWrong, index);
+    const correct = `운영자는 ${object(s.oldMetric)} 늘리는 대신 ${s.evidence}에서 확인한 조건을 반영했다`;
+    // 정답만 길면 길이로 답이 드러나므로 오답도 같은 길이의 서술문으로 맞춘다.
+    const c = choicesWithAnswer(
+      correct,
+      [
+        `운영자는 ${object(s.evidence)} 확인하기 전에 ${object(s.oldMetric)} 먼저 줄였다`,
+        `운영자는 ${object(s.oldMetric)} 늘리자 이용자 불편이 곧바로 사라졌다고 밝혔다`,
+        `운영자는 이용자 조사를 생략하고 기존 운영 방식을 그대로 유지하기로 했다`,
+        `운영자는 ${s.evidence}에서 확인한 조건을 조정 대상에서 제외하기로 했다`,
+      ],
+      index,
+    );
     return {
       stem: "다음 글을 이해한 내용으로 가장 적절한 것은?",
       passage: s.passage,
@@ -439,13 +597,13 @@ function verbalQuestion(kindId: string, index: number): Draft {
       explanation: `본문은 조사 결과에 따라 운영을 조정하고 지표를 다시 확인하므로 같은 근거를 계속 측정하면 후속 조정이 가능하다고 추론할 수 있습니다.`,
     };
   }
-  const correct = `같은 시기에 ${s.subject} 주변의 접근성이 크게 개선됐다`;
+  const correct = s.alternativeCause;
   const c = choicesWithAnswer(
     correct,
     [
       `조정 뒤에도 ${object(s.evidence)} 기록했다`,
       `운영자가 결과를 공개했다`,
-      `${s.oldMetric}를 함께 집계했다`,
+      `${object(s.oldMetric)} 함께 집계했다`,
       `일부 이용자는 조정 내용을 알고 있었다`,
     ],
     index,
@@ -454,7 +612,7 @@ function verbalQuestion(kindId: string, index: number): Draft {
     stem: "운영 방식의 조정이 지표 개선의 원인이라는 주장에 대한 반박으로 가장 적절한 것은?",
     passage: s.passage,
     ...c,
-    explanation: `같은 시기의 접근성 개선은 지표 변화가 운영 조정이 아닌 다른 원인에서 비롯됐을 가능성을 제시합니다.`,
+    explanation: `같은 기간에 발생한 별도의 변화도 지표를 개선할 수 있으므로 운영 조정만을 원인으로 단정하기 어렵습니다.`,
   };
 }
 
@@ -483,7 +641,24 @@ function dataQuestion(kindId: string, index: number): Draft {
   const base = 70 + index * 3;
   const labels = ["A", "B", "C", "D", "E"];
   if (kindId === "data-trend") {
-    const values = [base, base + 8, base + 3, base + 14];
+    // 문항마다 꺾이는 구간을 바꿔 정답 문장이 고정되지 않도록 한다.
+    const shapes = [
+      { values: [base, base + 8, base + 3, base + 14], correct: 1 },
+      { values: [base + 10, base + 2, base + 6, base + 12], correct: 0 },
+      { values: [base, base + 6, base + 13, base + 7], correct: 2 },
+      { values: [base, base + 5, base + 11, base + 18], correct: 3 },
+      { values: [base + 18, base + 12, base + 7, base], correct: 4 },
+    ];
+    const shape = shapes[index % shapes.length];
+    const values = shape.values;
+    // "…구간에서만"으로 한정해야 전 구간 감소 자료에서 복수 정답이 생기지 않는다.
+    const statements = [
+      "1분기에서 2분기 구간에서만 감소하였다",
+      "2분기에서 3분기 구간에서만 감소하였다",
+      "3분기에서 4분기 구간에서만 감소하였다",
+      "네 분기 내내 증가하였다",
+      "네 분기 내내 감소하였다",
+    ];
     const visual: ProblemVisual = {
       type: "bar-chart",
       id: `trend-${index}`,
@@ -492,23 +667,24 @@ function dataQuestion(kindId: string, index: number): Draft {
       categories: ["1분기", "2분기", "3분기", "4분기"],
       series: [{ id: `trend-series-${index}`, name: "처리 건수", values, color: "#c8755a" }],
     };
-    const correct = "2분기에서 3분기에 감소하였다";
+    const correct = statements[shape.correct];
     const c = choicesWithAnswer(
       correct,
-      [
-        "모든 분기에 증가하였다",
-        "1분기가 가장 많다",
-        "3분기가 가장 많다",
-        "4분기는 1분기보다 적다",
-      ],
+      statements.filter((statement) => statement !== correct),
       index,
     );
+    const detail =
+      shape.correct === 3
+        ? `${values.join(" → ")}건으로 한 번도 줄지 않았습니다.`
+        : shape.correct === 4
+          ? `${values.join(" → ")}건으로 한 번도 늘지 않았습니다.`
+          : `${shape.correct + 1}분기 ${values[shape.correct]}건에서 ${shape.correct + 2}분기 ${values[shape.correct + 1]}건으로 감소했습니다.`;
     return {
       stem: "다음 자료에 대한 설명으로 옳은 것은?",
       passage: "",
       visuals: [visual],
       ...c,
-      explanation: `2분기 ${base + 8}건에서 3분기 ${base + 3}건으로 감소했습니다.`,
+      explanation: detail,
     };
   }
   const rowValues = labels.map(
@@ -522,16 +698,19 @@ function dataQuestion(kindId: string, index: number): Draft {
       rowValues,
       "건",
     );
-    const max = rowValues[4][1];
-    const correct = `상반기 완료 건수는 E 부서가 ${max}건으로 가장 많다`;
+    // 다섯 선지를 같은 형식으로 맞춰 길이만 보고 정답을 고르지 못하게 한다.
+    const column = index % 2 === 0 ? 1 : 2;
+    const period = column === 1 ? "상반기" : "하반기";
+    const columnValues = rowValues.map((row) => row[column] as number);
+    const winner = columnValues.indexOf(Math.max(...columnValues));
+    const statement = (i: number) =>
+      `${period} 완료 건수는 ${labels[i]} 부서가 ${columnValues[i]}건으로 가장 많다`;
     const c = choicesWithAnswer(
-      correct,
-      [
-        "상반기는 A 부서가 가장 많다",
-        "하반기는 A 부서가 가장 많다",
-        "C 부서의 두 기간 값은 같다",
-        "모든 부서가 하반기에 감소했다",
-      ],
+      statement(winner),
+      labels
+        .map((_, i) => i)
+        .filter((i) => i !== winner)
+        .map(statement),
       index,
     );
     return {
@@ -539,7 +718,7 @@ function dataQuestion(kindId: string, index: number): Draft {
       passage: "",
       visuals: [visual],
       ...c,
-      explanation: `상반기 열에서 가장 큰 값은 E 부서의 ${max}건입니다.`,
+      explanation: `${period} 열에서 가장 큰 값은 ${labels[winner]} 부서의 ${columnValues[winner]}건입니다. 나머지 선지는 건수는 맞지만 최댓값이 아닙니다.`,
     };
   }
   if (kindId === "data-simple-sum") {
@@ -552,12 +731,13 @@ function dataQuestion(kindId: string, index: number): Draft {
       rowValues,
       "건",
     );
-    const correct = `${labels[winner]} 지점의 상반기 합계가 ${sums[winner]}건으로 가장 많다`;
+    const statement = (i: number) => `${labels[i]} 지점의 상반기 합계가 ${sums[i]}건으로 가장 많다`;
     const c = choicesWithAnswer(
-      correct,
+      statement(winner),
       labels
-        .filter((_, i) => i !== winner)
-        .map((x, i) => `${x} 지점의 상반기 합계가 ${sums[i]}건으로 가장 많다`),
+        .map((_, i) => i)
+        .filter((i) => i !== winner)
+        .map(statement),
       index,
     );
     return {
@@ -569,8 +749,10 @@ function dataQuestion(kindId: string, index: number): Draft {
     };
   }
   if (kindId === "data-easy-rate") {
-    const prior = 160 + index * 8;
-    const current = (prior * 5) / 4;
+    const rates = [10, 20, 25, 50];
+    const rate = rates[index % rates.length];
+    const prior = 160 + index * 20;
+    const current = prior + (prior * rate) / 100;
     const visual = tableVisual(
       `rate-${index}`,
       "제품별 판매량",
@@ -582,11 +764,11 @@ function dataQuestion(kindId: string, index: number): Draft {
       "개",
     );
     const c = choicesWithAnswer(
-      "A 제품의 증가율은 25%이다",
+      `A 제품의 증가율은 ${rate}%이다`,
       [
-        "A 제품의 증가율은 20%이다",
-        "A 제품의 증가율은 50%이다",
-        "B 제품의 증가율은 25%이다",
+        ...rates
+          .filter((value) => value !== rate)
+          .map((value) => `A 제품의 증가율은 ${value}%이다`),
         "두 제품의 증가량은 같다",
       ],
       index,
@@ -596,7 +778,7 @@ function dataQuestion(kindId: string, index: number): Draft {
       passage: "",
       visuals: [visual],
       ...c,
-      explanation: `A 제품은 ${prior}개에서 ${current}개로 ${current - prior}개 증가했고, 증가량은 전년 값의 25%입니다.`,
+      explanation: `A 제품은 ${prior}개에서 ${current}개로 ${current - prior}개 늘었고, 증가량은 전년 값의 ${rate}%입니다.`,
     };
   }
   if (kindId === "data-easy-chain") {
@@ -633,27 +815,25 @@ function dataQuestion(kindId: string, index: number): Draft {
   }
   if (kindId === "data-share-rate") {
     const total = 1000 + index * 100;
-    const a = total * 0.3;
+    const shares = [30, 25, 20, 15, 10];
+    const amounts = shares.map((share) => (total * share) / 100);
     const visual = tableVisual(
       `share-${index}`,
       "제품군별 매출",
       ["제품군", "매출"],
-      [
-        ["A", a],
-        ["B", total * 0.25],
-        ["C", total * 0.2],
-        ["D", total * 0.15],
-        ["E", total * 0.1],
-      ],
+      labels.map((label, i) => [label, amounts[i]] as [string, number]),
       "백만 원",
     );
+    // 문항마다 묻는 제품군을 바꿔 정답 문장이 반복되지 않게 한다.
+    const pick = index % shares.length;
+    const other = (pick + 2) % shares.length;
     const c = choicesWithAnswer(
-      "A 제품군의 전체 매출 비중은 30%이다",
+      `${labels[pick]} 제품군의 전체 매출 비중은 ${shares[pick]}%이다`,
       [
-        "A 제품군의 비중은 3%이다",
-        "B 제품군의 비중은 30%이다",
-        "C 제품군의 비중은 25%이다",
-        "E 제품군의 비중은 20%이다",
+        `${labels[pick]} 제품군의 전체 매출 비중은 ${shares[pick] + 5}%이다`,
+        `${labels[pick]} 제품군의 전체 매출 비중은 ${shares[pick] - 5}%이다`,
+        `${labels[other]} 제품군의 전체 매출 비중은 ${shares[pick]}%이다`,
+        `A와 B 제품군의 매출 합은 전체의 60%이다`,
       ],
       index,
     );
@@ -662,7 +842,7 @@ function dataQuestion(kindId: string, index: number): Draft {
       passage: `전체 매출은 ${comma(total)}백만 원이다.`,
       visuals: [visual],
       ...c,
-      explanation: `${comma(a)}을 전체 ${comma(total)}으로 나누면 0.3이므로 30%입니다.`,
+      explanation: `${numberObject(amounts[pick])} 전체 ${numberTo(total)} 나누면 ${shares[pick] / 100}이므로 ${shares[pick]}%입니다.`,
     };
   }
   if (kindId === "data-average") {
@@ -681,7 +861,7 @@ function dataQuestion(kindId: string, index: number): Draft {
       passage: "",
       visuals: [visual],
       ...c,
-      explanation: `${center}을 기준으로 편차가 -12, -5, 0, 5, 12로 상쇄되므로 평균은 ${center}건입니다.`,
+      explanation: `${numberObject(center)} 기준으로 편차가 -12, -5, 0, 5, 12로 상쇄되므로 평균은 ${center}건입니다.`,
     };
   }
   if (kindId === "data-derived-value") {
@@ -719,16 +899,33 @@ function dataQuestion(kindId: string, index: number): Draft {
     ],
     "억 원",
   );
-  const box =
-    "ㄱ. A의 2024년 증가액은 12억 원이다.\nㄴ. A의 2025년 증가액은 18억 원이다.\nㄷ. A의 2년간 총 증가액은 30억 원이다.";
-  const c = choicesWithAnswer("ㄱ, ㄴ, ㄷ", ["ㄱ", "ㄴ", "ㄱ, ㄴ", "ㄴ, ㄷ"], index);
+  // 문항마다 참·거짓 조합을 바꿔 정답이 항상 "ㄱ, ㄴ, ㄷ"이 되지 않게 한다.
+  const falseOne = index % 4; // 0이면 모두 참, 1~3이면 해당 항목만 거짓
+  const shown = [
+    falseOne === 1 ? 12 + 3 : 12,
+    falseOne === 2 ? 18 - 4 : 18,
+    falseOne === 3 ? 30 + 5 : 30,
+  ];
+  const box = `ㄱ. A의 2024년 증가액은 ${shown[0]}억 원이다.\nㄴ. A의 2025년 증가액은 ${shown[1]}억 원이다.\nㄷ. A의 2년간 총 증가액은 ${shown[2]}억 원이다.`;
+  const combos = ["ㄱ, ㄴ, ㄷ", "ㄴ, ㄷ", "ㄱ, ㄷ", "ㄱ, ㄴ"];
+  const correct = combos[falseOne];
+  const c = choicesWithAnswer(
+    correct,
+    combos.filter((combo) => combo !== correct).concat("ㄱ"),
+    index,
+  );
+  const wrongLabel = ["", "ㄱ", "ㄴ", "ㄷ"][falseOne];
   return {
     stem: "다음 자료에 대한 설명으로 옳은 것만을 <보기>에서 모두 고른 것은?",
     passage: "",
     visuals: [visual],
     box,
     ...c,
-    explanation: `A의 값은 ${p0}, ${p1}, ${p2}이므로 증가액은 각각 12와 18이고 전체 증가는 30입니다. 따라서 ㄱ, ㄴ, ㄷ이 모두 옳습니다.`,
+    explanation:
+      `A의 값은 ${p0}, ${p1}, ${p2}이므로 구간별 증가액은 12와 18이고 2년간 총 증가액은 30입니다. ` +
+      (falseOne === 0
+        ? "따라서 ㄱ, ㄴ, ㄷ이 모두 옳습니다."
+        : `${wrongLabel}의 수치만 자료와 다르므로 정답은 ${correct}입니다.`),
   };
 }
 
@@ -764,14 +961,12 @@ function mathQuestion(kindId: string, index: number): Draft {
       salt = (initial * rate) / 100,
       result = (salt / (initial + water)) * 100;
     const rounded = Math.round(result * 10) / 10;
-    const c = choicesWithAnswer(
-      `${rounded}%`,
-      [
-        `${Math.max(1, rounded - 5)}%`,
-        `${rounded + 5}%`,
-        `${rounded + 10}%`,
-        `${Math.round((salt / water) * 100)}%`,
-      ],
+    const c = rankedChoices(
+      { value: rounded, text: `${rounded}%` },
+      [-7, -5, -3, -1.5, 1.5, 3, 5, 7]
+        .map((offset) => Math.round((rounded + offset) * 10) / 10)
+        .filter((value) => value > 0)
+        .map((value) => ({ value, text: `${value}%` })),
       index,
     );
     return {
@@ -782,15 +977,29 @@ function mathQuestion(kindId: string, index: number): Draft {
     };
   }
   if (kindId === "math-concentration-ratio") {
-    const low = 5 + index,
-      high = low + 20,
-      target = low + 10;
-    const c = choicesWithAnswer("1:1", ["1:2", "2:1", "1:3", "3:1"], index);
+    // 목표 농도를 옮겨 정답 비율이 1:1로 고정되지 않게 한다.
+    const ratios = [
+      [1, 1],
+      [1, 2],
+      [2, 1],
+      [1, 3],
+      [3, 1],
+    ];
+    const [p, q] = ratios[index % ratios.length];
+    const low = 4 + index,
+      high = low + 12,
+      target = (q * high + p * low) / (p + q);
+    const correct = `${p}:${q}`;
+    const c = choicesWithAnswer(
+      correct,
+      ratios.map(([a, b]) => `${a}:${b}`).filter((value) => value !== correct),
+      index,
+    );
     return {
       stem: `${low}%와 ${high}% 용액을 섞어 ${target}% 용액을 만들 때 두 용액의 양의 비는?`,
       passage: "두 용액 외에 물이나 용질을 추가하지 않는다.",
       ...c,
-      explanation: `목표 농도와 두 농도의 차이가 각각 10%p로 같으므로 양의 비는 1:1입니다.`,
+      explanation: `${low}% 용액과 목표의 차이는 ${target - low}%p, ${high}% 용액과의 차이는 ${high - target}%p이므로 양의 비는 그 반대인 ${correct}입니다.`,
     };
   }
   if (kindId === "math-population-equation") {
@@ -803,18 +1012,23 @@ function mathQuestion(kindId: string, index: number): Draft {
       stem: "원래 A 집단의 인원은?",
       passage: `A와 B의 합은 ${total}명이다. A가 10% 늘고 B가 10% 줄면 합은 ${changed}명이 된다. 모든 인원은 자연수이다.`,
       ...c,
-      explanation: `A+B=${total}, 1.1A+0.9B=${changed}를 연립하면 A=${a}명입니다.`,
+      explanation: `A+B=${total}, 1.1A+0.9B=${changed} 두 식을 연립하면 A=${a}명입니다.`,
     };
   }
   if (kindId === "math-population-multiple") {
     const original = 50 + index * 5,
       after = (original * 6) / 5;
-    const c = numberChoices(after, 6, index, "명");
+    // 오답은 6의 배수가 되지 않도록 6과 서로소인 간격만 사용한다.
+    const slot = slotFor(index);
+    const below = [-2, -5, -8, -11].slice(0, slot).reverse();
+    const above = [2, 5, 8, 11].slice(0, 4 - slot);
+    const choices = [...below, 0, ...above].map((offset) => `${comma(after + offset)}명`);
     return {
       stem: "인원을 정확히 20% 늘린 뒤 인원으로 가능한 것은?",
       passage: "조정 전후 인원은 모두 자연수이며 반올림하지 않는다.",
-      ...c,
-      explanation: `조정 뒤 인원은 원래 인원의 6/5이므로 6의 배수여야 하며, 선지 중 ${after}명이 조건을 만족합니다.`,
+      choices,
+      answer: slot,
+      explanation: `조정 뒤 인원은 원래 인원의 6/5이므로 6의 배수여야 합니다. 선지 중 6으로 나누어떨어지는 값은 ${after}명뿐입니다.`,
     };
   }
   if (kindId === "math-price-profit") {
@@ -842,9 +1056,9 @@ function mathQuestion(kindId: string, index: number): Draft {
     };
   }
   if (kindId === "math-count-factorial") {
-    const n = 5 + (index % 3),
+    const n = 4 + (index % 5),
       answer = factorial(n),
-      c = numberChoices(answer, Math.max(2, factorial(n - 2)), index);
+      c = numberChoices(answer, Math.max(2, Math.round(answer / 10)), index);
     return {
       stem: `${countScenario}에서 서로 다른 ${n}명의 발표 순서를 정하는 경우의 수는?`,
       passage: "모든 발표자는 한 번씩 발표하며 같은 순서는 하나로 센다.",
@@ -875,9 +1089,9 @@ function mathQuestion(kindId: string, index: number): Draft {
     };
   }
   if (kindId === "math-count-bundle") {
-    const n = 4 + (index % 3),
+    const n = 4 + (index % 5),
       answer = factorial(n - 1) * 2,
-      c = numberChoices(answer, 2, index);
+      c = numberChoices(answer, Math.max(2, Math.round(answer / 8)), index);
     return {
       stem: `${countScenario} 참가자 ${n}명을 한 줄로 세울 때 A와 B가 이웃하는 경우의 수는?`,
       passage: `A와 B를 포함한 ${n}명은 모두 서로 다르다.`,
@@ -886,9 +1100,9 @@ function mathQuestion(kindId: string, index: number): Draft {
     };
   }
   if (kindId === "math-count-separated") {
-    const n = 4 + (index % 3),
+    const n = 4 + (index % 5),
       answer = factorial(n) - factorial(n - 1) * 2,
-      c = numberChoices(answer, 2, index);
+      c = numberChoices(answer, Math.max(2, Math.round(answer / 8)), index);
     return {
       stem: `${countScenario} 참가자 ${n}명을 한 줄로 세울 때 A와 B가 이웃하지 않는 경우의 수는?`,
       passage: `A와 B를 포함한 ${n}명은 모두 서로 다르다.`,
@@ -897,10 +1111,10 @@ function mathQuestion(kindId: string, index: number): Draft {
     };
   }
   if (kindId === "math-count-group") {
-    const n = index % 2 ? 8 : 6,
+    const n = [6, 8, 10, 12][index % 4],
       r = n / 2,
       answer = combination(n, r) / 2,
-      c = numberChoices(answer, Math.max(2, n / 2), index);
+      c = numberChoices(answer, Math.max(2, Math.round(answer / 6)), index);
     return {
       stem: `${countScenario} 참가자 ${n}명을 ${r}명씩 이름 없는 두 조로 나누는 경우의 수는?`,
       passage: "두 조의 이름은 없으며 조의 순서만 다른 경우는 같게 센다.",
@@ -909,7 +1123,7 @@ function mathQuestion(kindId: string, index: number): Draft {
     };
   }
   if (kindId === "math-count-select") {
-    const n = 6 + (index % 3),
+    const n = 6 + (index % 5),
       answer = combination(n, 2) - combination(n - 2, 2),
       c = numberChoices(answer, 2, index);
     return {
@@ -920,9 +1134,9 @@ function mathQuestion(kindId: string, index: number): Draft {
     };
   }
   if (kindId === "math-count-circle") {
-    const n = 5 + (index % 3),
+    const n = 4 + (index % 5),
       answer = factorial(n - 1),
-      c = numberChoices(answer, Math.max(2, factorial(n - 3)), index);
+      c = numberChoices(answer, Math.max(2, Math.round(answer / 8)), index);
     return {
       stem: `${countScenario} 참가자 ${n}명이 원탁에 앉는 경우의 수는?`,
       passage: "회전하여 같은 배치는 하나로 센다.",
@@ -931,24 +1145,48 @@ function mathQuestion(kindId: string, index: number): Draft {
     };
   }
   if (kindId === "math-probability-basic") {
-    const failDen = 2 + (index % 4),
+    // 다섯 선지를 서로 다른 사건의 확률로 두고, 발문이 그중 하나를 지정한다.
+    const failDen = 4 + (index % 3),
       den = failDen ** 2,
-      num = den - 1;
-    const probabilityChoices = [
-      ...Array.from({ length: den - 1 }, (_, numerator) => fractionText(numerator + 1, den)),
-      "0",
-      "1/2",
-      "1",
-    ].filter(
-      (value, choiceIndex, values) =>
-        value !== `${num}/${den}` && values.indexOf(value) === choiceIndex,
+      success = failDen - 1;
+    const events = [
+      {
+        ask: "한 번 이상 성공할",
+        value: fractionText(den - 1, den),
+        why: `두 번 모두 실패할 확률 1/${den}의 여사건입니다`,
+      },
+      {
+        ask: "두 번 모두 성공할",
+        value: fractionText(success * success, den),
+        why: `성공 확률 ${success}/${failDen}의 제곱입니다`,
+      },
+      {
+        ask: "두 번 모두 실패할",
+        value: fractionText(1, den),
+        why: `실패 확률 1/${failDen}의 제곱입니다`,
+      },
+      {
+        ask: "정확히 한 번만 성공할",
+        value: fractionText(2 * success, den),
+        why: `성공과 실패의 순서가 두 가지이므로 ${success}/${den}에 2를 곱합니다`,
+      },
+      {
+        ask: "한 번 이상 실패할",
+        value: fractionText(2 * failDen - 1, den),
+        why: `두 번 모두 성공할 확률 ${success * success}/${den}의 여사건입니다`,
+      },
+    ];
+    const picked = events[index % events.length];
+    const c = choicesWithAnswer(
+      picked.value,
+      events.filter((event) => event !== picked).map((event) => event.value),
+      index,
     );
-    const c = choicesWithAnswer(`${num}/${den}`, probabilityChoices, index);
     return {
-      stem: `${probabilityScenarios[index]} 과정에서 독립적인 두 번의 시도 중 한 번 이상 성공할 확률은?`,
-      passage: `각 시도의 실패 확률은 1/${failDen}이며, 두 시도의 결과는 서로 독립이다.`,
+      stem: `${probabilityScenarios[index]} 과정에서 독립적인 두 번의 시도 중 ${picked.ask} 확률은?`,
+      passage: `각 시도의 성공 확률은 ${success}/${failDen}이며, 두 시도의 결과는 서로 독립이다.`,
       ...c,
-      explanation: `두 번 모두 실패할 확률은 1/${failDen}×1/${failDen}=1/${den}이므로 여사건의 확률은 ${num}/${den}입니다.`,
+      explanation: `${picked.why}. 따라서 ${picked.value}입니다.`,
     };
   }
   if (kindId === "math-probability-conditional") {
@@ -959,10 +1197,21 @@ function mathQuestion(kindId: string, index: number): Draft {
         (v) => v % 2 === 0 && v > threshold,
       ).length,
       correct = fractionText(favorable, sample);
-    const probabilityChoices = Array.from({ length: sample + 1 }, (_, numerator) =>
-      numerator === 0 ? "0" : numerator === sample ? "1" : fractionText(numerator, sample),
-    ).filter((value) => value !== correct);
-    const c = choicesWithAnswer(correct, probabilityChoices, index);
+    // 0과 1은 계산 없이 지워지므로 제외하고, 정답 위아래로 후보를 고루 둔다.
+    const pool = [
+      ...Array.from({ length: sample - 1 }, (_, i) => [i + 1, sample] as const),
+      [1, 3] as const,
+      [2, 3] as const,
+      [1, 4] as const,
+      [3, 4] as const,
+      [2, 5] as const,
+      [3, 5] as const,
+      [1, 2] as const,
+    ].map(([numerator, denominator]) => ({
+      value: numerator / denominator,
+      text: fractionText(numerator, denominator),
+    }));
+    const c = rankedChoices({ value: favorable / sample, text: correct }, pool, index);
     return {
       stem: `1부터 ${maximum}까지의 정수 중 하나를 같은 확률로 고른다. 고른 수가 짝수일 때 ${threshold}보다 클 확률은?`,
       passage: "이미 짝수를 골랐다는 조건 안에서 표본공간을 다시 정한다.",
@@ -977,12 +1226,13 @@ function mathQuestion(kindId: string, index: number): Draft {
       speed2 = speed1 + 20,
       answer = distance / speed2;
     const rounded = Math.round(answer * 100) / 100,
+      exact = Number.isInteger(answer * 100),
       c = numberChoices(rounded, 0.25, index, "시간");
     return {
       stem: "같은 거리를 더 빠른 속력으로 이동할 때 걸리는 시간은?",
-      passage: `시속 ${speed1}km로 ${time1}시간 이동한 거리를 시속 ${speed2}km로 이동한다.`,
+      passage: `시속 ${speed1}km로 ${time1}시간 이동한 거리를 시속 ${speed2}km로 이동한다. 필요한 경우 소수 셋째 자리에서 반올림한다.`,
       ...c,
-      explanation: `거리는 ${distance}km이고 ${distance}÷${speed2}=${rounded}시간입니다.`,
+      explanation: `거리는 ${distance}km이고 ${distance}÷${speed2}${exact ? "=" : "≈"}${rounded}시간입니다.`,
     };
   }
   if (kindId === "math-distance-train") {
@@ -1000,22 +1250,25 @@ function mathQuestion(kindId: string, index: number): Draft {
   }
   if (kindId === "math-distance-relative") {
     const a = 50 + index * 2,
-      b = 60 + index * 3,
-      distance = a + b,
-      answer = 1,
+      b = 70 + index * 2,
+      answer = 0.5 + 0.5 * (index % 5), // 0.5~2.5시간
+      distance = (a + b) * answer,
       c = numberChoices(answer, 0.25, index, "시간");
     return {
       stem: "서로 마주 오는 두 차량이 만날 때까지 걸리는 시간은?",
       passage: `두 차량 사이 거리는 ${distance}km이고 속력은 각각 시속 ${a}km와 ${b}km이다.`,
       ...c,
-      explanation: `상대속력은 ${a + b}km/h이므로 ${distance}÷${a + b}=1시간입니다.`,
+      explanation: `상대속력은 ${a + b}km/h이므로 ${distance}÷${a + b}=${answer}시간입니다.`,
     };
   }
   if (kindId === "math-work-single") {
-    const days = 5 + (index % 8),
-      c = choicesWithAnswer(
-        `1/${days}`,
-        [`1/${days - 2}`, `1/${days - 1}`, `1/${days + 1}`, `1/${days + 2}`],
+    const days = 6 + (index % 8),
+      c = rankedChoices(
+        { value: 1 / days, text: `1/${days}` },
+        [-4, -3, -2, -1, 1, 2, 3, 4]
+          .map((offset) => days + offset)
+          .filter((value) => value >= 2)
+          .map((value) => ({ value: 1 / value, text: `1/${value}` })),
         index,
       );
     return {
@@ -1026,7 +1279,7 @@ function mathQuestion(kindId: string, index: number): Draft {
     };
   }
   if (kindId === "math-work-together") {
-    const a = 6 + (index % 3) * 3,
+    const a = 6 + (index % 5) * 3,
       b = a * 2,
       answer = 1 / (1 / a + 1 / b),
       c = numberChoices(answer, 1, index, "일");
@@ -1043,21 +1296,25 @@ function mathQuestion(kindId: string, index: number): Draft {
       numerator = totalDays - worked,
       denominator = totalDays * 2,
       rate = fractionText(numerator, denominator);
-    const c = choicesWithAnswer(
-      rate,
+    const c = rankedChoices(
+      { value: numerator / denominator, text: rate },
       [
-        `1/${totalDays}`,
-        fractionText(numerator, totalDays),
-        fractionText(numerator - 1, denominator),
-        "1/2",
-      ],
+        [1, totalDays] as const,
+        [numerator, totalDays] as const,
+        [numerator - 1, denominator] as const,
+        [numerator + 1, denominator] as const,
+        [1, 2] as const,
+        [1, 4] as const,
+        [2, 3] as const,
+        [3, 4] as const,
+      ].map(([n, d]) => ({ value: n / d, text: fractionText(n, d) })),
       index,
     );
     return {
       stem: `${workScenario}에서 B의 하루 작업량은 전체의 얼마인가?`,
       passage: `A는 혼자 ${totalDays}일 만에 ${workScenario} 작업을 끝낸다. A가 ${worked}일 일한 뒤 남은 작업을 B가 2일 동안 완료했다. 전체 작업량은 1이다.`,
       ...c,
-      explanation: `A가 2/${totalDays}을 끝낸 뒤 남은 ${numerator}/${totalDays}을 B가 2일에 처리하므로 B의 하루 작업량은 ${rate}입니다.`,
+      explanation: `A가 2일 동안 2/${totalDays}만큼 끝냈고 남은 ${numerator}/${totalDays}만큼을 B가 2일에 처리하므로 B의 하루 작업량은 ${rate}입니다.`,
     };
   }
   if (kindId === "math-work-capacity") {
@@ -1073,16 +1330,17 @@ function mathQuestion(kindId: string, index: number): Draft {
     };
   }
   if (kindId === "math-age") {
-    const child = 10 + index,
-      years = 5,
-      ratio = 3,
+    // 자녀 나이가 많아질수록 배수를 낮춰 부모 나이가 비현실적으로 커지지 않게 한다.
+    const child = 8 + (index % 12),
+      years = 3 + (index % 5),
+      ratio = child <= 14 ? 3 : 2,
       parent = ratio * (child + years) - years;
     const c = numberChoices(child, 1, index, "세");
     return {
       stem: "자녀의 현재 나이는?",
       passage: `현재 부모와 자녀의 나이 합은 ${parent + child}세이다. ${years}년 후 부모의 나이는 자녀의 나이의 ${ratio}배이다.`,
       ...c,
-      explanation: `자녀를 x로 두면 부모는 ${parent + child}-x이고 ${years}년 후 관계식을 풀어 x=${child}세를 얻습니다.`,
+      explanation: `자녀를 x로 두면 부모는 ${parent + child}-x이고, ${years}년 후 ${parent + child}-x+${years}=${ratio}(x+${years})를 풀면 x=${child}세입니다.`,
     };
   }
   const chairs = 12 + index * 4,
@@ -1154,60 +1412,61 @@ function logicQuestion(kindId: string, index: number): Draft {
     c = baseC;
   const condition = (lines: string[]) => lines.map((x, i) => `㉠㉡㉢㉣㉤`[i] + ` ${x}`).join("\n");
   if (kindId === "logic-conclusion-blank") {
-    const correct = `모든 ${a}는 ${c}이다`,
+    const correct = `모든 ${topic(a)} ${c}이다`,
       x = choicesWithAnswer(
         correct,
         [
-          `모든 ${c}는 ${a}이다`,
-          `어떤 ${a}도 ${c}가 아니다`,
-          `모든 ${b}는 ${a}이다`,
-          `어떤 ${c}는 ${b}가 아니다`,
+          `모든 ${topic(c)} ${a}이다`,
+          `어떤 ${a}도 ${subject(c)} 아니다`,
+          `모든 ${topic(b)} ${a}이다`,
+          `어떤 ${topic(c)} ${subject(b)} 아니다`,
         ],
         index,
       );
     return {
       stem: "다음 전제가 모두 참일 때 반드시 참인 결론은?",
-      passage: `모든 ${a}는 ${b}이다.\n모든 ${b}는 ${c}이다.`,
+      passage: `모든 ${topic(a)} ${b}이다.\n모든 ${topic(b)} ${c}이다.`,
       ...x,
-      explanation: `${a}가 ${b}에 포함되고 ${b}가 ${c}에 포함되므로 모든 ${a}는 ${c}입니다.`,
+      explanation: `${subject(a)} ${b}에 포함되고 ${subject(b)} ${c}에 포함되므로 모든 ${topic(a)} ${c}입니다.`,
     };
   }
   if (kindId === "logic-premise-small") {
-    const correct = `모든 ${a}는 ${b}이다`,
+    const correct = `모든 ${topic(a)} ${b}이다`,
       x = choicesWithAnswer(
         correct,
         [
-          `모든 ${b}는 ${a}이다`,
-          `어떤 ${a}는 ${b}가 아니다`,
-          `모든 ${c}는 ${a}이다`,
-          `어떤 ${b}는 ${c}이다`,
+          `모든 ${topic(b)} ${a}이다`,
+          `어떤 ${topic(a)} ${subject(b)} 아니다`,
+          `모든 ${topic(c)} ${a}이다`,
+          `어떤 ${topic(b)} ${c}이다`,
         ],
         index,
       );
     return {
       stem: "결론이 반드시 성립하도록 빈칸에 들어갈 전제로 적절한 것은?",
-      passage: `빈칸\n모든 ${b}는 ${c}이다.\n결론: 모든 ${a}는 ${c}이다.`,
+      passage: `빈칸\n모든 ${topic(b)} ${c}이다.\n결론: 모든 ${topic(a)} ${c}이다.`,
       ...x,
-      explanation: `작은 집합인 ${a}에서 ${b}로 이어지는 전제가 있어야 기존 전제와 연결됩니다.`,
+      explanation: `작은 집합인 ${a}에서 ${withRo(b)} 이어지는 전제가 있어야 기존 전제와 연결됩니다.`,
     };
   }
   if (kindId === "logic-premise-large") {
-    const correct = `모든 ${b}는 ${c}이다`,
+    // 결론과 같은 문장("모든 a는 c이다")은 그 자체로 결론을 보장하므로 선지에서 제외한다.
+    const correct = `모든 ${topic(b)} ${c}이다`,
       x = choicesWithAnswer(
         correct,
         [
-          `모든 ${c}는 ${b}이다`,
-          `어떤 ${b}는 ${c}가 아니다`,
-          `모든 ${a}는 ${c}이다`,
-          `어떤 ${c}는 ${a}이다`,
+          `모든 ${topic(c)} ${b}이다`,
+          `어떤 ${topic(b)} ${subject(c)} 아니다`,
+          `어떤 ${topic(b)} ${c}이다`,
+          `어떤 ${topic(c)} ${a}이다`,
         ],
         index,
       );
     return {
       stem: "결론이 반드시 성립하도록 빈칸에 들어갈 전제로 적절한 것은?",
-      passage: `모든 ${a}는 ${b}이다.\n빈칸\n결론: 모든 ${a}는 ${c}이다.`,
+      passage: `모든 ${topic(a)} ${b}이다.\n빈칸\n결론: 모든 ${topic(a)} ${c}이다.`,
       ...x,
-      explanation: `도착 집합 ${c}로 이어지려면 모든 ${b}가 ${c}라는 전제가 필요합니다.`,
+      explanation: `도착 집합 ${withRo(c)} 이어지려면 모든 ${subject(b)} ${c}라는 전제가 필요합니다.`,
     };
   }
   if (kindId === "logic-chain") {
@@ -1220,10 +1479,16 @@ function logicQuestion(kindId: string, index: number): Draft {
       S: result,
       T: "추가 조사를 중단한다",
     };
+    // 정답만 내용 문장이고 오답은 기호 문장이면 형식으로 답이 드러나므로 모두 내용 문장으로 맞춘다.
     const correct = propositions.S,
       x = choicesWithAnswer(
         correct,
-        ["R은 거짓이다", "Q는 거짓이다", propositions.T, "P는 거짓이다"],
+        [
+          `${action}하지 않는다`,
+          `${object(evidence)} 조사하지 않는다`,
+          propositions.T,
+          `${topic(service)} 운영 개선 대상이 아니다`,
+        ],
         index,
       );
     return {
@@ -1234,41 +1499,41 @@ function logicQuestion(kindId: string, index: number): Draft {
     };
   }
   if (kindId === "logic-some-amo") {
-    const correct = `어떤 ${a}는 ${c}이다`,
+    const correct = `어떤 ${topic(a)} ${c}이다`,
       x = choicesWithAnswer(
         correct,
         [
-          `모든 ${a}는 ${c}이다`,
-          `어떤 ${c}도 ${a}가 아니다`,
-          `모든 ${c}는 ${b}이다`,
-          `어떤 ${a}는 ${b}가 아니다`,
+          `모든 ${topic(a)} ${c}이다`,
+          `어떤 ${c}도 ${subject(a)} 아니다`,
+          `모든 ${topic(c)} ${b}이다`,
+          `어떤 ${topic(a)} ${subject(b)} 아니다`,
         ],
         index,
       );
     return {
       stem: "다음 전제가 모두 참일 때 반드시 참인 것은?",
-      passage: `어떤 ${a}는 ${b}이다.\n모든 ${b}는 ${c}이다.`,
+      passage: `어떤 ${topic(a)} ${b}이다.\n모든 ${topic(b)} ${c}이다.`,
       ...x,
-      explanation: `실제로 존재하는 ${a} 중 ${b}인 대상은 모든 ${b}가 ${c}라는 전제에 따라 ${c}이기도 합니다.`,
+      explanation: `실제로 존재하는 ${a} 중 ${b}인 대상은 모든 ${subject(b)} ${c}라는 전제에 따라 ${c}이기도 합니다.`,
     };
   }
   if (kindId === "logic-some-mmo") {
-    const correct = `어떤 ${a}는 ${c}이다`,
+    const correct = `어떤 ${topic(a)} ${c}이다`,
       x = choicesWithAnswer(
         correct,
         [
-          `모든 ${c}는 ${a}이다`,
-          `어떤 ${a}도 ${c}가 아니다`,
-          `어떤 ${b}는 ${a}가 아니다`,
-          `모든 ${a}는 ${b}가 아니다`,
+          `모든 ${topic(c)} ${a}이다`,
+          `어떤 ${a}도 ${subject(c)} 아니다`,
+          `어떤 ${topic(b)} ${subject(a)} 아니다`,
+          `모든 ${topic(a)} ${subject(b)} 아니다`,
         ],
         index,
       );
     return {
       stem: "다음 전제가 모두 참일 때 반드시 참인 것은?",
-      passage: `모든 ${a}는 ${b}이다.\n모든 ${b}는 ${c}이다.\n어떤 ${a}가 존재한다.`,
+      passage: `모든 ${topic(a)} ${b}이다.\n모든 ${topic(b)} ${c}이다.\n어떤 ${subject(a)} 존재한다.`,
       ...x,
-      explanation: `존재하는 ${a}는 ${b}를 거쳐 ${c}에도 포함되므로 어떤 ${a}는 ${c}입니다.`,
+      explanation: `존재하는 ${topic(a)} ${object(b)} 거쳐 ${c}에도 포함되므로 어떤 ${topic(a)} ${c}입니다.`,
     };
   }
   const names = Array.from(
@@ -1294,7 +1559,7 @@ function logicQuestion(kindId: string, index: number): Draft {
       passage: p,
       passageLabel: "조건",
       ...x,
-      explanation: `${order[0]}, ${order[1]}, ${order[2]}이 앞의 세 자리를 이루고 뒤의 두 자리에는 ${order[3]}, ${order[4]}가 오므로 세 번째는 ${target}입니다.`,
+      explanation: `${order[0]}, ${order[1]}, ${subject(order[2])} 앞의 세 자리를 이루고 뒤의 두 자리에는 ${order[3]}, ${subject(order[4])} 오므로 세 번째는 ${target}입니다.`,
     };
   }
   if (kindId === "logic-item") {
@@ -1320,21 +1585,35 @@ function logicQuestion(kindId: string, index: number): Draft {
     };
   }
   if (kindId === "logic-number") {
-    const target = 3,
+    // 남겨 두는 두 수를 문항마다 바꿔 정답이 항상 3이 되지 않게 한다.
+    const pairs = [
+      [1, 2],
+      [2, 3],
+      [3, 4],
+      [4, 5],
+      [2, 5],
+    ];
+    const [small, large] = pairs[index % pairs.length];
+    const fixed = [1, 2, 3, 4, 5].filter((value) => value !== small && value !== large);
+    const target = small,
       p = condition([
-        `${topic(names[0])} 1을 받는다.`,
-        `${topic(names[4])} 5를 받는다.`,
+        `${topic(names[0])} ${numberObject(fixed[0])} 받는다.`,
+        `${topic(names[4])} ${numberObject(fixed[2])} 받는다.`,
         `${topic(names[2])} ${names[1]}보다 큰 수를 받는다.`,
-        `${withAnd(names[1])} ${subject(names[2])} 받은 수의 합은 7이다.`,
-        `${topic(names[3])} 2를 받는다.`,
+        `${withAnd(names[1])} ${subject(names[2])} 받은 수의 합은 ${small + large}이다.`,
+        `${topic(names[3])} ${numberObject(fixed[1])} 받는다.`,
       ]);
-    const x = choicesWithAnswer(String(target), ["1", "2", "4", "5"], index);
+    const x = choicesWithAnswer(
+      String(target),
+      ["1", "2", "3", "4", "5"].filter((value) => value !== String(target)),
+      index,
+    );
     return {
-      stem: `다음 조건을 만족할 때 ${names[1]}이 받는 수는?`,
+      stem: `다음 조건을 만족할 때 ${subject(names[1])} 받는 수는?`,
       passage: p,
       passageLabel: "조건",
       ...x,
-      explanation: `1, 2, 5가 사용됐고 남은 3과 4의 합은 7이며 ${names[2]}가 더 크므로 ${names[1]}은 3입니다.`,
+      explanation: `${fixed[0]}, ${fixed[1]}, ${numberSubject(fixed[2])} 이미 사용됐고 남은 ${numberAnd(small)} ${large}의 합은 ${small + large}입니다. ${subject(names[2])} 더 크므로 ${topic(names[1])} ${target}입니다.`,
     };
   }
   const liar = names[1],
@@ -1344,7 +1623,7 @@ function logicQuestion(kindId: string, index: number): Draft {
     stem: "네 사람 중 한 명만 거짓말할 때 거짓말하는 사람은?",
     passage: p,
     ...x,
-    explanation: `첫째와 넷째 사람의 같은 진술이 참이면 ${liar}가 유일한 거짓말쟁이가 되고 나머지 진술도 모순 없이 성립합니다.`,
+    explanation: `첫째와 넷째 사람의 같은 진술이 참이면 ${subject(liar)} 유일한 거짓말쟁이가 되고 나머지 진술도 모순 없이 성립합니다.`,
   };
 }
 
@@ -1382,7 +1661,7 @@ function sequenceQuestion(kindId: string, index: number): Draft {
       passage: "",
       visuals: [sequenceVisual(index, [...vals.map(String), "(   )"])],
       ...c,
-      explanation: `앞 항에 ${ratio}를 곱하므로 다음 수는 ${answer}입니다.`,
+      explanation: `앞 항에 ${numberObject(ratio)} 곱하므로 다음 수는 ${answer}입니다.`,
     };
   }
   if (kindId === "sequence-difference") {
@@ -1423,7 +1702,7 @@ function sequenceQuestion(kindId: string, index: number): Draft {
       passage: "",
       visuals: [sequenceVisual(index, [...vals.map(String), "(   )"])],
       ...c,
-      explanation: `각 항은 2²부터 이어지는 제곱수에 ${offset}을 더한 값이므로 다음 수는 ${answer}입니다.`,
+      explanation: `각 항은 2²부터 이어지는 제곱수에 ${numberObject(offset)} 더한 값이므로 다음 수는 ${answer}입니다.`,
     };
   }
   if (kindId === "sequence-factorial") {
@@ -1465,7 +1744,7 @@ function sequenceQuestion(kindId: string, index: number): Draft {
       passage: "",
       visuals: [sequenceVisual(index, [...vals.map(String), "(   )"])],
       ...c,
-      explanation: `각 항에 2를 곱하고 ${add}을 더하므로 다음 수는 ${answer}입니다.`,
+      explanation: `각 항에 2를 곱하고 ${numberObject(add)} 더하므로 다음 수는 ${answer}입니다.`,
     };
   }
   if (kindId === "sequence-fraction") {
@@ -1475,14 +1754,17 @@ function sequenceQuestion(kindId: string, index: number): Draft {
       nextA = offset + 5,
       nextB = offset + 6;
     const correct = `${a * nextB}/${b * nextA}`,
-      c = choicesWithAnswer(
-        correct,
+      c = rankedChoices(
+        { value: (a * nextB) / (b * nextA), text: correct },
         [
-          `${a}/${b}`,
-          `${nextA}/${nextB}`,
-          `${a * nextA}/${b * nextB}`,
-          `${b * nextA}/${a * nextB}`,
-        ],
+          [a, b] as const,
+          [nextA, nextB] as const,
+          [a * nextA, b * nextB] as const,
+          [offset + 5, offset + 7] as const,
+          [b * nextA, a * nextB] as const,
+          [b * nextB, a * nextA] as const,
+          [b, a] as const,
+        ].map(([n, d]) => ({ value: n / d, text: `${n}/${d}` })),
         index,
       );
     return {
@@ -1507,9 +1789,20 @@ function sequenceQuestion(kindId: string, index: number): Draft {
     answer = vals[4] * 3,
     shown = vals.map(roundedDecimal),
     correct = roundedDecimal(answer),
-    c = choicesWithAnswer(
-      correct,
-      [answer / 3, answer - 1, answer + 1, answer * 2].map(roundedDecimal),
+    c = rankedChoices(
+      { value: answer, text: correct },
+      [
+        answer / 3,
+        answer / 2,
+        answer - 1,
+        answer - 0.6,
+        answer + 0.6,
+        answer + 1,
+        answer * 1.5,
+        answer * 2,
+      ]
+        .map((value) => Math.round(value * 10000) / 10000)
+        .map((value) => ({ value, text: roundedDecimal(value) })),
       index,
     );
   return {
@@ -1522,11 +1815,19 @@ function sequenceQuestion(kindId: string, index: number): Draft {
 }
 
 function createDraft(kind: ProblemKind, index: number): Draft {
-  if (kind.id.startsWith("verbal-")) return verbalQuestion(kind.id, index);
-  if (kind.id.startsWith("data-")) return dataQuestion(kind.id, index);
-  if (kind.id.startsWith("math-")) return mathQuestion(kind.id, index);
-  if (kind.id.startsWith("logic-")) return logicQuestion(kind.id, index);
-  return sequenceQuestion(kind.id, index);
+  activeSlots = slotPlan(kind.id);
+  const draft = kind.id.startsWith("verbal-")
+    ? verbalQuestion(kind.id, index)
+    : kind.id.startsWith("data-")
+      ? dataQuestion(kind.id, index)
+      : kind.id.startsWith("math-")
+        ? mathQuestion(kind.id, index)
+        : kind.id.startsWith("logic-")
+          ? logicQuestion(kind.id, index)
+          : sequenceQuestion(kind.id, index);
+  // (A)~(E) 위치 선지는 순서 자체가 의미이므로 정렬하지 않는다.
+  if (draft.choices.every((choice) => /^\([A-E]\)$/.test(choice))) return draft;
+  return sortNumericChoices(draft);
 }
 
 export const EXAMPLE_QUESTION_BANK: ExampleQuestion[] = CATEGORIES.flatMap((category) =>

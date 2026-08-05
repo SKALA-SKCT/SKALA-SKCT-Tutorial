@@ -1,4 +1,19 @@
+import { readFile } from "node:fs/promises";
 import { createServer } from "vite";
+
+/**
+ * 템플릿 문자열에서 치환값 바로 뒤에 조사를 직접 적으면 값에 따라 조사가 어긋난다.
+ * 표면 문장만 보고는 조사와 어간을 구분할 수 없으므로 생성기 소스에서 막는다.
+ */
+const HARDCODED_PARTICLE = /\}(은|는|이|가|을|를|과|와|으로|로)(?=[\s.,)?"`])/g;
+
+/** 오답 후보가 모자랄 때만 쓰이는 예비 문구. 실제 선지에 등장하면 생성 로직 결함이다. */
+const FALLBACK_CHOICES = [
+  "조건만으로 구할 수 없다",
+  "제시된 값 중에는 없다",
+  "모든 값이 가능하다",
+  "조건이 서로 모순된다",
+];
 
 const server = await createServer({ server: { middlewareMode: true }, appType: "custom" });
 
@@ -16,6 +31,7 @@ try {
   const ids = new Set();
   const substantiveQuestions = new Map();
   const countByKind = new Map();
+  const answerPositions = new Map();
   const numericValue = (choice) => {
     const match = choice
       .replaceAll(",", "")
@@ -30,6 +46,9 @@ try {
     if (ids.has(question.id)) fail(question.id, "중복 ID");
     ids.add(question.id);
     countByKind.set(question.kindId, (countByKind.get(question.kindId) ?? 0) + 1);
+    if (!answerPositions.has(question.kindId))
+      answerPositions.set(question.kindId, [0, 0, 0, 0, 0]);
+    answerPositions.get(question.kindId)[question.answer] += 1;
 
     const metadata = kindMap.get(question.kindId);
     if (!metadata) fail(question.id, `등록되지 않은 세부 유형 ${question.kindId}`);
@@ -60,6 +79,8 @@ try {
     if (/NaN|undefined|Infinity/.test(text)) fail(question.id, "잘못된 계산 결과 노출");
     if (/\d\.\d{5,}/.test(text)) fail(question.id, "부동소수점 오차 노출");
     if (/서비스은|경로을|검사을|수요을/.test(text)) fail(question.id, "조사 사용 오류");
+    if (FALLBACK_CHOICES.some((choice) => question.choices.includes(choice)))
+      fail(question.id, "오답 선지가 예비 문구로 채워짐");
     if (question.categoryId === "data-analysis" && !question.visuals?.length)
       fail(question.id, "자료해석 시각 자료 없음");
     if (question.categoryId === "sequence-reasoning" && !question.visuals?.length)
@@ -80,6 +101,24 @@ try {
   for (const { kind } of expectedKinds)
     if (countByKind.get(kind.id) !== 20)
       fail(kind.id, `문항 수 ${countByKind.get(kind.id) ?? 0}개 (예상 20개)`);
+
+  // 정답 번호가 한두 자리에 몰리면 문제를 풀지 않고도 답을 찍을 수 있다.
+  for (const [kindId, positions] of answerPositions) {
+    const used = positions.filter((count) => count > 0).length;
+    if (used < 4) fail(kindId, `정답 번호 분포 ${positions.join("/")} (사용된 자리 ${used}개)`);
+    if (positions.some((count) => count > 10))
+      fail(kindId, `정답 번호 분포 ${positions.join("/")} (한 자리에 절반 초과)`);
+  }
+
+  const source = await readFile(
+    new URL("../src/data/exampleQuestions.ts", import.meta.url),
+    "utf8",
+  );
+  for (const line of source.split("\n")) {
+    const match = line.match(HARDCODED_PARTICLE);
+    if (match)
+      fail("exampleQuestions.ts", `치환값 뒤 조사 고정: ${match.join(", ")} — ${line.trim()}`);
+  }
 
   if (failures.length) {
     console.error(failures.join("\n"));

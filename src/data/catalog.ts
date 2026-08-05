@@ -405,7 +405,7 @@ export const CATEGORIES: Category[] = [
           ),
           kind(
             "math-count-factorial",
-            "일렬 배치",
+            "일렬 배열",
             "서로 다른 대상을 한 줄로 세웁니다.",
             "n명을 모두 세우면 n!이고, 고정 자리가 있으면 그 자리를 제외한 대상만 팩토리얼로 계산합니다.",
           ),
