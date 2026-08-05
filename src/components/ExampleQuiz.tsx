@@ -24,7 +24,7 @@ export default function ExampleQuiz({
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [zoom, setZoom] = useState(100);
-  const [showType, setShowType] = useState(true);
+  const [showType, setShowType] = useState(() => !title.includes("랜덤"));
   const [showTip, setShowTip] = useState(false);
   const question = questions[index];
   const selected = answers[question.id];
