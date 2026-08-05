@@ -30,7 +30,9 @@ export default function StudyHub({
           </div>
           <div>
             <h2>풀이 튜토리얼</h2>
-            <p>풀이 과정을 차례로 따라가며 핵심 단서와 판단 기준을 익힐 수 있습니다.</p>
+            <p>
+              풀이 과정을 차례로 따라가며 세부 유형 종류별 핵심 단서와 판단 기준을 익힐 수 있습니다.
+            </p>
           </div>
           <strong>튜토리얼 시작 →</strong>
         </button>

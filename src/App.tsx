@@ -26,9 +26,8 @@ function Page({ route, navigate }: PageProps) {
     category?.subtypes.find((item) => item.id === route.subtypeId) ?? null;
 
   if (category && subtype && route.mode === "tutorial") {
-    const tutorialIds = subtype.tutorialIds ?? [subtype.tutorialId];
-    const tutorials = tutorialIds
-      .map((id) => PROBLEMS.find((problem) => problem.id === id))
+    const tutorials = subtype.kinds
+      .map((kind) => PROBLEMS.find((problem) => problem.id === kind.tutorialId))
       .filter((problem): problem is (typeof PROBLEMS)[number] => Boolean(problem));
     if (tutorials.length > 0) {
       return (
