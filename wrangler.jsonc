@@ -8,9 +8,9 @@
   // injects the assets directory, so we don't set it here.
   "assets": {
     "binding": "ASSETS",
-    "not_found_handling": "single-page-application"
+    "not_found_handling": "single-page-application",
   },
   "observability": {
-    "enabled": true
-  }
+    "enabled": true,
+  },
 }

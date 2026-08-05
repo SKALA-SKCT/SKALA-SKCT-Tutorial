@@ -14,9 +14,7 @@ export default function Passage({ segments, activeIds, dimmed }: Props) {
   // Scroll the first highlighted segment into view when the step changes.
   useEffect(() => {
     if (!containerRef.current || activeIds.length === 0) return;
-    const el = containerRef.current.querySelector<HTMLElement>(
-      `[data-seg="${activeIds[0]}"]`,
-    );
+    const el = containerRef.current.querySelector<HTMLElement>(`[data-seg="${activeIds[0]}"]`);
     el?.scrollIntoView({ behavior: "smooth", block: "center" });
     // activeKey is a stable stringified form of activeIds.
   }, [activeKey]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -34,8 +32,7 @@ export default function Passage({ segments, activeIds, dimmed }: Props) {
         <p key={i} className="passage-para">
           {para.map((seg) => {
             const active = activeIds.includes(seg.id);
-            const cls =
-              (seg.kind === "position" ? "pos" : "seg") + (active ? " active" : "");
+            const cls = (seg.kind === "position" ? "pos" : "seg") + (active ? " active" : "");
             return (
               <span key={seg.id} data-seg={seg.id} className={cls}>
                 {seg.text}
