@@ -26,11 +26,15 @@ function Page({ route, navigate }: PageProps) {
     category?.subtypes.find((item) => item.id === route.subtypeId) ?? null;
 
   if (category && subtype && route.mode === "tutorial") {
-    const tutorial = PROBLEMS.find((problem) => problem.id === subtype.tutorialId);
-    if (tutorial) {
+    const tutorialIds = subtype.tutorialIds ?? [subtype.tutorialId];
+    const tutorials = tutorialIds
+      .map((id) => PROBLEMS.find((problem) => problem.id === id))
+      .filter((problem): problem is (typeof PROBLEMS)[number] => Boolean(problem));
+    if (tutorials.length > 0) {
       return (
         <TutorialPlayer
-          problem={tutorial}
+          problems={tutorials}
+          subtypeName={subtype.name}
           title={`${category.name} ${subtype.name} 풀이 튜토리얼`}
           onBack={() => navigate(`/${category.id}/${subtype.id}`)}
         />

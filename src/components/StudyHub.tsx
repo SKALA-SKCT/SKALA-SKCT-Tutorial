@@ -25,17 +25,23 @@ export default function StudyHub({
       <div className="mode-grid">
         <button className="mode-card tutorial-mode" onClick={onTutorial}>
           <span className="mode-icon">01</span>
+          <div className="mode-visual" aria-hidden="true">
+            <img src="/images/tutorial-guide.png" alt="" />
+          </div>
           <div>
             <h2>풀이 튜토리얼</h2>
-            <p>문장을 단계별로 강조하며 접근 순서와 정답 근거를 익힙니다.</p>
+            <p>풀이 과정을 차례로 따라가며 핵심 단서와 판단 기준을 익힐 수 있습니다.</p>
           </div>
           <strong>튜토리얼 시작 →</strong>
         </button>
         <button className="mode-card example-mode" onClick={onExamples}>
           <span className="mode-icon">02</span>
+          <div className="mode-visual" aria-hidden="true">
+            <img src="/images/example-practice.png" alt="" />
+          </div>
           <div>
             <h2>예시문제 풀기</h2>
-            <p>배운 전략을 {category.examples.length}개의 대표 문제에 바로 적용합니다.</p>
+            <p>실전과 같은 화면에서 대표 문제를 풀며 익힌 전략을 점검할 수 있습니다.</p>
           </div>
           <strong>예시문제 시작 →</strong>
         </button>

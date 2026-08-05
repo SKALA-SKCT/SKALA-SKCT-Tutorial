@@ -4,7 +4,7 @@ export type ProblemType = "single-blank" | "insertion";
 export interface Segment {
   id: string;
   text: string;
-  /** "sentence" (default) or "position" — an (A)~(E) insertion slot. */
+  /** "sentence" (default) or "position" for an (A)~(E) insertion slot. */
   kind?: "sentence" | "position";
   /** Start a new paragraph before this segment. */
   newParagraph?: boolean;
@@ -32,6 +32,8 @@ export interface Step {
 export interface Problem {
   id: string;
   type: ProblemType;
+  /** Specific question format shown inside a subtype tutorial set. */
+  internalTypeName: string;
   /** Short label for pills, e.g. "빈칸 추론 / 빈칸 1개". */
   typeLabel: string;
   /** One-line description shown on the home card. */

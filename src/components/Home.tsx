@@ -9,6 +9,10 @@ export default function Home({
 }) {
   return (
     <div className="home">
+      <header className="home-head">
+        <h1>유형별 문제 연습</h1>
+        <p>SKCT의 5개 인지 영역을 유형별로 나누어 핵심 풀이 전략을 익히고 예시문제로 연습할 수 있습니다.</p>
+      </header>
       <div className="category-grid">
         {categories.map((category) => (
           <button

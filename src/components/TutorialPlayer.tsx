@@ -6,15 +6,23 @@ import ExamHeader from "./ExamHeader";
 import ExamTools from "./exam/ExamTools";
 
 interface Props {
-  problem: Problem;
+  problems: Problem[];
+  subtypeName: string;
   title: string;
   onBack: () => void;
 }
 
-export default function TutorialPlayer({ problem, title, onBack }: Props) {
+export default function TutorialPlayer({ problems, subtypeName, title, onBack }: Props) {
+  const [problemIndex, setProblemIndex] = useState(0);
   const [stepIndex, setStepIndex] = useState(0);
   const [zoom, setZoom] = useState(100);
+  const problem = problems[problemIndex];
   const step = problem.steps[stepIndex];
+  const internalTypeName = problem.internalTypeName;
+  const selectProblem = (index: number) => {
+    setProblemIndex(index);
+    setStepIndex(0);
+  };
 
   // Once any step up to here has `reveal`, keep the answer shown.
   const revealed = problem.steps.slice(0, stepIndex + 1).some((s) => s.reveal);
@@ -61,10 +69,26 @@ export default function TutorialPlayer({ problem, title, onBack }: Props) {
         </aside>
 
         <div className="exam-question-column">
+          <nav className="tutorial-question-nav" aria-label="튜토리얼 유형 이동">
+            {problems.map((item, index) => (
+              <button
+                type="button"
+                className={index === problemIndex ? "active" : ""}
+                key={item.id}
+                aria-label={`${index + 1}번 유형`}
+                aria-current={index === problemIndex ? "page" : undefined}
+                onClick={() => selectProblem(index)}
+              >
+                {index + 1}
+              </button>
+            ))}
+          </nav>
           <div className="exam-question-card">
             <div className="exam-question-label">
-              <span>{problem.typeLabel}</span>
-              <button onClick={onBack}>나가기</button>
+              <span>
+                {subtypeName} {problemIndex + 1}/{problems.length}
+                <small className="tutorial-internal-label">{internalTypeName}</small>
+              </span>
             </div>
             <div className="tutorial-problem-content">
               <div className="exam-prompt">
@@ -90,7 +114,14 @@ export default function TutorialPlayer({ problem, title, onBack }: Props) {
           </div>
         </div>
 
-        <ExamTools resetKey={`${problem.id}:${stepIndex}`} onExit={onBack} />
+        <ExamTools
+          resetKey={`${problem.id}:${stepIndex}`}
+          onExit={onBack}
+          onPrevious={() => selectProblem(problemIndex - 1)}
+          onNext={() => selectProblem(problemIndex + 1)}
+          previousDisabled={problemIndex === 0}
+          nextDisabled={problemIndex === problems.length - 1}
+        />
       </div>
     </div>
   );

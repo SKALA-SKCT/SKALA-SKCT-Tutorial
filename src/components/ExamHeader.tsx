@@ -10,9 +10,9 @@ export default function ExamHeader({
   zoom: number;
   onZoom: (value: number) => void;
 }) {
-  const [seconds, setSeconds] = useState(15 * 60);
+  const [seconds, setSeconds] = useState(0);
   useEffect(() => {
-    const timer = window.setInterval(() => setSeconds((value) => Math.max(0, value - 1)), 1000);
+    const timer = window.setInterval(() => setSeconds((value) => value + 1), 1000);
     return () => window.clearInterval(timer);
   }, []);
   const time = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
@@ -21,7 +21,7 @@ export default function ExamHeader({
       <div className="exam-header-inner">
         <strong>{title}</strong>
         <div className="exam-header-center">
-          <small>남은 시간</small>
+          <small>풀이 시간</small>
           <b className="exam-timer">{time}</b>
         </div>
         <div className="zoom-control">

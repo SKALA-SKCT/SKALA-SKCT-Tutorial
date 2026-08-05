@@ -1,4 +1,5 @@
 import type { Problem } from "../types";
+import { VERBAL_TUTORIAL_PROBLEMS } from "./verbalTutorials";
 
 /**
  * Sample problems. Each `passage` is split into segments so a step can
@@ -6,9 +7,11 @@ import type { Problem } from "../types";
  * entry mirrors the friendly, click-through explanation for that type.
  */
 export const PROBLEMS: Problem[] = [
+  ...VERBAL_TUTORIAL_PROBLEMS,
   {
     id: "single-blank",
     type: "single-blank",
+    internalTypeName: "빈칸 한 곳 추론",
     typeLabel: "빈칸 추론 / 빈칸 1개",
     typeSummary: "빈칸이 한 군데 뚫려 있는 문제",
     strategy:
@@ -98,6 +101,7 @@ export const PROBLEMS: Problem[] = [
   {
     id: "insertion",
     type: "insertion",
+    internalTypeName: "문장 삽입 위치 판단",
     typeLabel: "문장 삽입 / 위치 여러 곳",
     typeSummary: "<보기> 문장이 들어갈 위치를 (A)~(E)에서 고르는 문제",
     strategy:
