@@ -1,9 +1,9 @@
 # SKCT 유형별 풀이 튜토리얼
 
-SKCT 전자책의 분류와 풀이 전략을 기준으로 **언어이해, 자료해석, 창의수리, 언어추리,
+SKCT의 출제 분류와 풀이 전략을 기준으로 **언어이해, 자료해석, 창의수리, 언어추리,
 수열추리**를 단계별로 학습하는 튜토리얼 앱입니다. 흐름은 다음과 같습니다.
 
-`5개 영역 → 세부 유형 → 풀이 튜토리얼 → 세부 유형 종류`
+`5개 영역, 세부 유형, 풀이 튜토리얼, 세부 유형 종류`
 
 현재 21개 세부 유형 아래 65개 세부 유형 종류가 있으며, 모든 종류에 독립적인 문제와
 3단계 해설, 실전 풀이 팁이 연결되어 있습니다. 튜토리얼 상단의 번호로 같은 세부 유형에
@@ -11,8 +11,8 @@ SKCT 전자책의 분류와 풀이 전략을 기준으로 **언어이해, 자료
 
 ## 기술 스택
 
-- **Vite + React (TypeScript)** — 프론트엔드
-- **Cloudflare Workers + Static Assets** (`@cloudflare/vite-plugin`) — 배포
+- **Vite + React (TypeScript)** 프론트엔드
+- **Cloudflare Workers + Static Assets** (`@cloudflare/vite-plugin`) 배포
   - 정적 React 앱을 Worker가 서빙하고, `worker/index.ts`의 `/api/*` 자리는
     향후 **Claude API로 해설을 자동 생성**하는 백엔드를 얹을 공간입니다.
 
@@ -20,7 +20,7 @@ SKCT 전자책의 분류와 풀이 전략을 기준으로 **언어이해, 자료
 
 ```bash
 npm install
-npm run dev      # 개발 서버 (Vite + workerd) — http://localhost:5173
+npm run dev      # 개발 서버 (Vite + workerd) http://localhost:5173
 ```
 
 ## 빌드 / 배포

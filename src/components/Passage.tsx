@@ -5,9 +5,10 @@ interface Props {
   segments: Segment[];
   activeIds: string[];
   dimmed: boolean;
+  label?: string;
 }
 
-export default function Passage({ segments, activeIds, dimmed }: Props) {
+export default function Passage({ segments, activeIds, dimmed, label }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const activeKey = activeIds.join(",");
 
@@ -28,6 +29,7 @@ export default function Passage({ segments, activeIds, dimmed }: Props) {
 
   return (
     <div ref={containerRef} className={`passage${dimmed ? " dimmed" : ""}`}>
+      {label && <strong className="passage-label">&lt;{label}&gt;</strong>}
       {paragraphs.map((para, i) => (
         <p key={i} className="passage-para">
           {para.map((seg) => {

@@ -1,4 +1,4 @@
-export type ProblemType = "single-blank" | "insertion";
+export type ProblemType = "standard" | "single-blank" | "insertion";
 
 /** One chunk of the passage. Sentences flow inline; positions render as pills. */
 export interface Segment {
@@ -25,9 +25,51 @@ export interface Step {
   highlightBox?: boolean;
   /** Choice ids to spotlight (e.g. while evaluating options). */
   highlightChoices?: string[];
+  /** Table cells, rows, or chart series to spotlight. */
+  highlightVisual?: string[];
   /** Once reached, the correct choice is marked as the answer. */
   reveal?: boolean;
 }
+
+export interface ProblemTable {
+  type: "table";
+  id: string;
+  title: string;
+  unit?: string;
+  columns: string[];
+  rows: {
+    id: string;
+    label: string;
+    cells: Array<string | number>;
+  }[];
+  note?: string;
+}
+
+export interface ProblemBarChart {
+  type: "bar-chart";
+  id: string;
+  title: string;
+  unit?: string;
+  categories: string[];
+  series: {
+    id: string;
+    name: string;
+    values: number[];
+    color?: string;
+  }[];
+}
+
+export interface ProblemSequence {
+  type: "sequence";
+  id: string;
+  title: string;
+  items: {
+    id: string;
+    value: string;
+  }[];
+}
+
+export type ProblemVisual = ProblemTable | ProblemBarChart | ProblemSequence;
 
 export interface Problem {
   id: string;
@@ -44,6 +86,10 @@ export interface Problem {
   stem: string;
   /** <보기> content for insertion-type problems. */
   box?: string;
+  /** Label shown above a structured passage, such as <조건>. */
+  passageLabel?: string;
+  /** Structured source material shown as an actual table or graph. */
+  visuals?: ProblemVisual[];
   passage: Segment[];
   choices: Choice[];
   answerId: string;

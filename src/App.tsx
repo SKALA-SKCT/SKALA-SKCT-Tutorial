@@ -1,89 +1,195 @@
 import { useEffect, useState } from "react";
 import { PROBLEMS } from "./data/problems";
-import { CATEGORIES, type Subtype } from "./data/catalog";
+import { CATEGORIES, type ExampleQuestion, type ProblemKind, type Subtype } from "./data/catalog";
+import { questionsForCategory, questionsForKind } from "./data/exampleQuestions";
 import Home from "./components/Home";
 import TutorialPlayer from "./components/TutorialPlayer";
 import SiteHeader from "./components/SiteHeader";
 import CategoryPage from "./components/CategoryPage";
 import StudyHub from "./components/StudyHub";
-import ExampleQuiz from "./components/ExampleQuiz";
+import ExampleQuiz, { type PracticeResult } from "./components/ExampleQuiz";
+import ExampleResult from "./components/ExampleResult";
+import RandomHub from "./components/RandomHub";
 
-type RouteMode = "tutorial" | "examples" | null;
+type RouteMode = "tutorial" | "examples" | "result" | null;
 interface RouteState {
   categoryId: string | null;
   subtypeId: string | null;
   mode: RouteMode;
+  kindId: string | null;
+  randomScope: string | null;
+}
+interface PracticeSession {
+  title: string;
+  questions: ExampleQuestion[];
+  returnPath: string;
+  resultPath: string;
 }
 
-interface PageProps {
+const shuffled = <T,>(items: T[]) => {
+  const result = [...items];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+};
+
+const categoryRandomSet = (categoryId: string, count = 20) => {
+  const groups = Object.values(
+    questionsForCategory(categoryId).reduce<Record<string, ExampleQuestion[]>>(
+      (current, question) => {
+        (current[question.kindId ?? "unknown"] ??= []).push(question);
+        return current;
+      },
+      {},
+    ),
+  ).map(shuffled);
+  const order = shuffled(groups);
+  return shuffled(
+    Array.from(
+      { length: count },
+      (_, index) => order[index % order.length][Math.floor(index / order.length)],
+    ),
+  );
+};
+
+function Page({
+  route,
+  navigate,
+  startPractice,
+  session,
+  result,
+  finishPractice,
+  leaveResult,
+}: {
   route: RouteState;
   navigate: (path: string) => void;
-}
-
-function Page({ route, navigate }: PageProps) {
+  startPractice: (config: PracticeSession) => void;
+  session: PracticeSession | null;
+  result: PracticeResult | null;
+  finishPractice: (value: PracticeResult) => void;
+  leaveResult: () => void;
+}) {
+  if (route.categoryId === "random") {
+    if (route.mode === "examples" && session)
+      return (
+        <ExampleQuiz
+          title={session.title}
+          questions={session.questions}
+          onFinish={finishPractice}
+        />
+      );
+    if (route.mode === "result" && result)
+      return <ExampleResult result={result} onLeave={leaveResult} />;
+    return (
+      <RandomHub
+        categories={CATEGORIES}
+        onBack={() => navigate("/")}
+        onSelect={(category) => {
+          const questions = categoryRandomSet(category.id);
+          startPractice({
+            title: `${category.name} 랜덤 예시문제`,
+            questions,
+            returnPath: "/random",
+            resultPath: `/random/${category.id}/result`,
+          });
+          navigate(`/random/${category.id}/examples`);
+        }}
+        onAll={() => {
+          const questions = shuffled(
+            CATEGORIES.flatMap((category) => categoryRandomSet(category.id, 4)),
+          );
+          startPractice({
+            title: "전체 영역 랜덤 예시문제",
+            questions,
+            returnPath: "/random",
+            resultPath: "/random/all/result",
+          });
+          navigate("/random/all/examples");
+        }}
+      />
+    );
+  }
   const category = CATEGORIES.find((item) => item.id === route.categoryId) ?? null;
   const subtype: Subtype | null =
     category?.subtypes.find((item) => item.id === route.subtypeId) ?? null;
-
-  if (category && subtype && route.mode === "tutorial") {
-    const tutorials = subtype.kinds
-      .map((kind) => PROBLEMS.find((problem) => problem.id === kind.tutorialId))
-      .filter((problem): problem is (typeof PROBLEMS)[number] => Boolean(problem));
-    if (tutorials.length > 0) {
+  const kind: ProblemKind | null = subtype?.kinds.find((item) => item.id === route.kindId) ?? null;
+  if (category && subtype && kind && route.mode === "tutorial") {
+    const tutorial = PROBLEMS.find((problem) => problem.id === kind.tutorialId);
+    if (tutorial)
       return (
         <TutorialPlayer
-          problems={tutorials}
-          subtypeName={subtype.name}
-          title={`${category.name} ${subtype.name} 풀이 튜토리얼`}
-          onBack={() => navigate(`/${category.id}/${subtype.id}`)}
+          problems={[tutorial]}
+          title={`${category.name} ${kind.name} 풀이 튜토리얼`}
+          onBack={() => navigate(`/${category.id}/${subtype.id}/${kind.id}`)}
         />
       );
-    }
   }
-
-  if (category && subtype && route.mode === "examples") {
+  if (category && subtype && kind && route.mode === "examples" && session)
     return (
-      <ExampleQuiz
-        category={category}
-        subtype={subtype}
-        onBack={() => navigate(`/${category.id}/${subtype.id}`)}
-      />
+      <ExampleQuiz title={session.title} questions={session.questions} onFinish={finishPractice} />
     );
-  }
-
-  if (category && subtype) {
+  if (category && subtype && kind && route.mode === "result" && result)
+    return <ExampleResult result={result} onLeave={leaveResult} />;
+  if (category && subtype && kind)
     return (
       <StudyHub
         category={category}
-        subtype={subtype}
+        kind={kind}
         onBack={() => navigate(`/${category.id}`)}
-        onTutorial={() => navigate(`/${category.id}/${subtype.id}/tutorial`)}
-        onExamples={() => navigate(`/${category.id}/${subtype.id}/examples`)}
+        onTutorial={() => navigate(`/${category.id}/${subtype.id}/${kind.id}/tutorial`)}
+        onExamples={() => {
+          startPractice({
+            title: `${category.name} ${kind.name} 예시문제`,
+            questions: shuffled(questionsForKind(kind.id)),
+            returnPath: `/${category.id}/${subtype.id}/${kind.id}`,
+            resultPath: `/${category.id}/${subtype.id}/${kind.id}/result`,
+          });
+          navigate(`/${category.id}/${subtype.id}/${kind.id}/examples`);
+        }}
       />
     );
-  }
-
-  if (category) {
+  if (category)
     return (
       <CategoryPage
         category={category}
         onBack={() => navigate("/")}
-        onSelect={(item) => navigate(`/${category.id}/${item.id}`)}
+        onSelect={(nextSubtype, nextKind) =>
+          navigate(`/${category.id}/${nextSubtype.id}/${nextKind.id}`)
+        }
       />
     );
-  }
-
-  return <Home categories={CATEGORIES} onSelect={(id) => navigate(`/${id}`)} />;
+  return (
+    <Home
+      categories={CATEGORIES}
+      onSelect={(id) => navigate(`/${id}`)}
+      onRandom={() => navigate("/random")}
+    />
+  );
 }
 
 export default function App() {
   const readRoute = (): RouteState => {
-    const [, categoryId = null, subtypeId = null, routeMode = null] =
-      window.location.pathname.split("/");
-    const mode: RouteMode = routeMode === "tutorial" || routeMode === "examples" ? routeMode : null;
-    return { categoryId, subtypeId, mode };
+    const parts = window.location.pathname.split("/").filter(Boolean);
+    if (parts[0] === "random")
+      return {
+        categoryId: "random",
+        subtypeId: null,
+        kindId: null,
+        randomScope: parts[1] ?? null,
+        mode: parts[2] === "examples" || parts[2] === "result" ? parts[2] : null,
+      };
+    const [categoryId = null, subtypeId = null, kindId = null, modeValue = null] = parts;
+    const mode: RouteMode =
+      modeValue === "tutorial" || modeValue === "examples" || modeValue === "result"
+        ? modeValue
+        : null;
+    return { categoryId, subtypeId, kindId, mode, randomScope: null };
   };
   const [route, setRoute] = useState(readRoute);
+  const [session, setSession] = useState<PracticeSession | null>(null);
+  const [result, setResult] = useState<PracticeResult | null>(null);
   useEffect(() => {
     const sync = () => setRoute(readRoute());
     window.addEventListener("popstate", sync);
@@ -94,13 +200,33 @@ export default function App() {
     setRoute(readRoute());
     window.scrollTo(0, 0);
   };
+  const finishPractice = (value: PracticeResult) => {
+    setResult(value);
+    if (session) navigate(session.resultPath);
+  };
+  const leaveResult = () => {
+    const path = session?.returnPath ?? "/";
+    setSession(null);
+    setResult(null);
+    navigate(path);
+  };
   const examMode = route.mode === "tutorial" || route.mode === "examples";
-
   return (
     <div className="app-shell">
       {!examMode && <SiteHeader />}
       <main className={`app${examMode ? " exam-app" : ""}`}>
-        <Page route={route} navigate={navigate} />
+        <Page
+          route={route}
+          navigate={navigate}
+          startPractice={(config) => {
+            setSession(config);
+            setResult(null);
+          }}
+          session={session}
+          result={result}
+          finishPractice={finishPractice}
+          leaveResult={leaveResult}
+        />
       </main>
     </div>
   );

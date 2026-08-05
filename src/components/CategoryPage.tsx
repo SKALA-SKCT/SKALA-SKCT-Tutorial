@@ -1,4 +1,4 @@
-import type { Category, Subtype } from "../data/catalog";
+import type { Category, ProblemKind, Subtype } from "../data/catalog";
 
 export default function CategoryPage({
   category,
@@ -7,7 +7,7 @@ export default function CategoryPage({
 }: {
   category: Category;
   onBack: () => void;
-  onSelect: (subtype: Subtype) => void;
+  onSelect: (subtype: Subtype, kind: ProblemKind) => void;
 }) {
   return (
     <section className="catalog-page">
@@ -21,15 +21,20 @@ export default function CategoryPage({
         </div>
       </header>
       <div className="subtype-grid">
-        {category.subtypes.map((subtype) => (
-          <button className="subtype-card" key={subtype.id} onClick={() => onSelect(subtype)}>
-            <div>
-              <h3>{subtype.name}</h3>
-              <p>{subtype.description}</p>
-            </div>
-            <span>학습하기 →</span>
-          </button>
-        ))}
+        {category.subtypes.flatMap((subtype) =>
+          subtype.kinds.map((kind) => (
+            <button
+              className="subtype-card"
+              key={kind.id}
+              onClick={() => onSelect(subtype, kind)}
+            >
+              <div>
+                <h3>{kind.name}</h3>
+                <p>{kind.description}</p>
+              </div>
+            </button>
+          )),
+        )}
       </div>
     </section>
   );

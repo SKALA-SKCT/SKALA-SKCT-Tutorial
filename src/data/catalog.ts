@@ -1,7 +1,15 @@
+import type { ProblemVisual } from "../types";
+
 export interface ExampleQuestion {
   id: string;
+  categoryId?: string;
+  kindId?: string;
+  typeLabel?: string;
   stem: string;
   passage: string;
+  passageLabel?: string;
+  box?: string;
+  visuals?: ProblemVisual[];
   choices: string[];
   answer: number;
   explanation: string;
@@ -85,7 +93,7 @@ const examples: Record<string, ExampleQuestion[]> = {
       passage: "세 사람은 한 줄로 선다.",
       choices: ["C가 A보다 앞이다", "A가 C보다 앞이다", "B가 첫째다", "C가 둘째다", "알 수 없다"],
       answer: 1,
-      explanation: "A-B-C의 선후 관계가 연결되므로 A가 C보다 앞입니다.",
+      explanation: "A가 B보다 앞이고 B가 C보다 앞이라는 관계가 연결되므로 A가 C보다 앞입니다.",
     },
   ],
   sequence: [
@@ -106,12 +114,14 @@ export const CATEGORIES: Category[] = [
     number: "01",
     name: "언어이해",
     color: "#ea002c",
-    description: "책 3부의 실제 발문을 기준으로 글의 목적과 선지 판단 방식을 나눴습니다.",
+    description:
+      "긴 글에서 중심 내용과 세부 정보를 판단하는 영역입니다. 핵심어와 문장 사이의 관계를 정확히 확인해야 합니다.",
     subtypes: [
       {
         id: "topic",
         name: "주제 찾기",
-        description: "글 전체가 전달하려는 중심 메시지를 고릅니다.",
+        description:
+          "글 전체의 중심 메시지를 찾는 유형입니다. 반복되는 핵심어와 결론을 먼저 확인해야 합니다.",
         kinds: [
           kind(
             "verbal-topic",
@@ -124,38 +134,40 @@ export const CATEGORIES: Category[] = [
       {
         id: "blank",
         name: "빈칸",
-        description: "빈칸의 수와 위치에 따라 읽기 순서를 달리합니다.",
+        description:
+          "문맥에 맞는 내용이나 문장의 위치를 찾는 유형입니다. 빈칸 앞뒤의 연결 표현과 반복되는 말을 확인해야 합니다.",
         kinds: [
           kind(
             "verbal-blank-single",
             "빈칸 한 곳",
             "전후 문맥으로 한 빈칸의 내용을 완성합니다.",
-            "지문부터 읽고 빈칸 직후의 구체적 설명을 근거로 잡은 뒤 선지를 확인합니다.",
+            "빈칸과 가까운 문장의 구체적 설명을 근거로 잡고 글 전체의 결론과 같은 방향인지 확인합니다.",
           ),
           kind(
             "verbal-blank-position",
             "문장 삽입 위치",
             "보기 문장이 들어갈 여러 위치 중 하나를 고릅니다.",
-            "보기부터 읽어 접속사·지시어·반복 키워드를 표시하고, 앞뒤 두 문장이 모두 자연스러운 위치만 남깁니다.",
+            "보기부터 읽어 접속사와 지시어, 반복 키워드를 표시하고 앞뒤 두 문장이 모두 자연스러운 위치만 남깁니다.",
           ),
         ],
       },
       {
         id: "content-match",
-        name: "내용 일치·불일치",
-        description: "본문과 선지의 작은 차이를 대조합니다.",
+        name: "내용 일치와 불일치",
+        description:
+          "본문과 선지의 내용이 같은지 판단하는 유형입니다. 수치와 범위, 순서와 서술어의 작은 차이를 놓치지 않아야 합니다.",
         kinds: [
           kind(
             "verbal-match-predicate",
-            "서술어·조건·표현 차이",
+            "서술어와 조건, 표현 차이",
             "행동과 조건이 바뀐 선지를 찾습니다.",
             "선지의 주어보다 서술어와 조건어를 먼저 표시해 본문의 표현과 일대일로 대조합니다.",
           ),
           kind(
             "verbal-match-range",
-            "범위·수치·시간·통계 차이",
+            "범위와 수치, 시간, 통계 차이",
             "범위나 숫자가 바뀐 선지를 찾습니다.",
-            "숫자 옆의 단위와 기준 시점을 함께 묶어 보고, 전체·일부 같은 범위 표현을 반드시 확인합니다.",
+            "숫자 옆의 단위와 기준 시점을 함께 묶어 보고 전체와 일부 같은 범위 표현을 반드시 확인합니다.",
           ),
           kind(
             "verbal-match-order",
@@ -174,20 +186,22 @@ export const CATEGORIES: Category[] = [
       {
         id: "paragraph-order",
         name: "순서 배열",
-        description: "문단의 도입·전개·결론과 연결 단서를 조합합니다.",
+        description:
+          "여러 문단을 자연스러운 흐름으로 배열하는 유형입니다. 도입 문단을 찾고 지시어와 인과관계를 연결해야 합니다.",
         kinds: [
           kind(
             "verbal-paragraph-order",
             "문단 순서 배열",
             "여러 문단을 자연스러운 흐름으로 배열합니다.",
-            "대상을 처음 소개하는 문단을 시작으로 잡고, 지시어·접속사·원인과 결과를 연결합니다.",
+            "대상을 처음 소개하는 문단을 시작으로 잡고 지시어와 접속사, 원인과 결과를 연결합니다.",
           ),
         ],
       },
       {
         id: "understanding-inference",
-        name: "이해·추론",
-        description: "본문 근거를 그대로 이해하거나 결합해 결론을 냅니다.",
+        name: "이해와 추론",
+        description:
+          "본문의 의미를 파악하고 근거를 결합해 결론을 찾는 유형입니다. 글 밖의 상식을 더하지 않고 제시된 내용만 사용해야 합니다.",
         kinds: [
           kind(
             "verbal-understanding",
@@ -206,7 +220,8 @@ export const CATEGORIES: Category[] = [
       {
         id: "counterargument",
         name: "주장 반박",
-        description: "글의 주장과 근거 연결을 약화하는 내용을 찾습니다.",
+        description:
+          "주장과 근거의 연결을 약화하는 내용을 찾는 유형입니다. 결론이 성립하려면 필요한 전제부터 확인해야 합니다.",
         kinds: [
           kind(
             "verbal-counterargument",
@@ -224,12 +239,14 @@ export const CATEGORIES: Category[] = [
     number: "02",
     name: "자료해석",
     color: "#c8755a",
-    description: "책 4부의 계산기 사용 효율을 기준으로 선지 유형을 세 단계로 분류했습니다.",
+    description:
+      "표와 그래프의 수치를 비교하고 계산하는 영역입니다. 필요한 값과 계산 순서를 먼저 정해야 합니다.",
     subtypes: [
       {
         id: "no-calculator",
         name: "계산기 없이 푸는 선지",
-        description: "자료를 읽거나 간단한 암산으로 빠르게 판단합니다.",
+        description:
+          "자료의 추이와 크기를 계산기 없이 판단하는 유형입니다. 자릿수와 증감 방향을 먼저 확인해야 합니다.",
         kinds: [
           kind(
             "data-trend",
@@ -245,9 +262,9 @@ export const CATEGORIES: Category[] = [
           ),
           kind(
             "data-simple-sum",
-            "단순 합·차 비교",
+            "단순 합과 차 비교",
             "암산 가능한 합과 차를 비교합니다.",
-            "공통값은 계산 전에 지우고 남은 차이만 비교해 입력 횟수를 줄입니다.",
+            "두 값을 더할 때 십의 자리 합으로 후보를 먼저 줄이고 비슷한 항목만 일의 자리까지 계산합니다.",
           ),
           kind(
             "data-easy-rate",
@@ -266,11 +283,12 @@ export const CATEGORIES: Category[] = [
       {
         id: "calculator-fast",
         name: "계산기로 빨리 푸는 선지",
-        description: "한두 번의 계산기 입력으로 정확하게 판단합니다.",
+        description:
+          "비중과 평균을 짧은 계산으로 구하는 유형입니다. 분자와 분모를 정한 뒤 필요한 값만 입력해야 합니다.",
         kinds: [
           kind(
             "data-share-rate",
-            "비중·증감률",
+            "비중과 증감률",
             "전체 대비 비중이나 전년 대비 증감률을 구합니다.",
             "증감률은 차이÷이전값, 비중은 부분÷전체 순서로 입력하고 선지 정밀도까지만 읽습니다.",
           ),
@@ -278,26 +296,27 @@ export const CATEGORIES: Category[] = [
             "data-average",
             "평균",
             "여러 항목의 평균을 구하거나 비교합니다.",
-            "두 집단 비교라면 각 합계를 모두 구하지 말고 항목별 차이의 합을 개수로 나눕니다.",
+            "기준값을 정한 뒤 각 값의 편차가 서로 상쇄되는지 확인하고 남는 편차만 항목 수로 나눕니다.",
           ),
           kind(
             "data-derived-value",
-            "특정값 계산·비교",
+            "특정값 계산과 비교",
             "자료의 비율로 숨은 실제값을 구합니다.",
-            "구하려는 값을 x로 두기 전에 선지 값을 역대입하면 계산 한 번으로 제거 가능한지 확인합니다.",
+            "일부 값과 비율이 주어지면 일부 값을 비율로 나누어 전체값을 구합니다.",
           ),
         ],
       },
       {
         id: "calculator-slow",
         name: "계산이 오래 걸리는 선지",
-        description: "여러 번 계산해야 해 풀이 순서를 전략적으로 정합니다.",
+        description:
+          "여러 항목을 반복해서 계산하고 비교하는 유형입니다. 공통값을 재사용하고 계산할 선지의 순서를 정해야 합니다.",
         kinds: [
           kind(
             "data-multi-calculation",
             "반복 계산",
             "연도나 항목별 값을 여러 번 계산합니다.",
-            "다른 선지를 먼저 처리하고 남았을 때만 계산하며, 공통 분모와 반복 입력값은 메모해 재사용합니다.",
+            "같은 항목의 구간별 증가액을 한 번씩 계산해 메모하고 여러 판단에 재사용합니다.",
           ),
         ],
       },
@@ -309,12 +328,14 @@ export const CATEGORIES: Category[] = [
     number: "03",
     name: "창의수리",
     color: "#d8a12d",
-    description: "책 5부의 장별 응용수리 유형과 실제 풀이 공식을 기준으로 분류했습니다.",
+    description:
+      "주어진 상황을 식으로 바꾸어 답을 구하는 영역입니다. 변하지 않는 값과 수량 사이의 관계를 먼저 찾아야 합니다.",
     subtypes: [
       {
         id: "concentration",
         name: "농도",
-        description: "혼합 전후에도 유지되는 성분량과 농도 차이를 이용합니다.",
+        description:
+          "용액을 섞거나 물과 성분을 더한 뒤 농도를 구하는 유형입니다. 혼합 전후에도 유지되는 성분량을 먼저 계산해야 합니다.",
         kinds: [
           kind(
             "math-concentration-mix",
@@ -324,7 +345,7 @@ export const CATEGORIES: Category[] = [
           ),
           kind(
             "math-concentration-add",
-            "물·성분 첨가",
+            "물과 성분 첨가",
             "물이나 성분을 더한 뒤 농도를 구합니다.",
             "농도식을 바로 세우지 말고 변하지 않는 소금의 양부터 계산합니다.",
           ),
@@ -339,7 +360,8 @@ export const CATEGORIES: Category[] = [
       {
         id: "population-change",
         name: "인원 수 변동",
-        description: "두 집단의 증감 조건으로 원래 인원이나 변동 후 인원을 구합니다.",
+        description:
+          "두 집단의 인원 변화로 원래 인원이나 변동 후 인원을 구하는 유형입니다. 전체 인원과 증감 후 인원을 각각 식으로 세워야 합니다.",
         kinds: [
           kind(
             "math-population-equation",
@@ -351,31 +373,33 @@ export const CATEGORIES: Category[] = [
             "math-population-multiple",
             "배수 판정",
             "정수 조건으로 가능한 선지를 빠르게 거릅니다.",
-            "10% 증가한 정수는 11의 배수처럼 분수의 분자 배수를 이용해 선지를 먼저 제거합니다.",
+            "20% 증가한 결과는 원래 인원의 6/5이므로 조정 뒤 인원이 6의 배수인지 먼저 확인합니다.",
           ),
         ],
       },
       {
         id: "price",
-        name: "원가·정가·판매가",
-        description: "할인과 이익 조건을 기준 금액에 순서대로 적용합니다.",
+        name: "원가와 정가, 판매가",
+        description:
+          "원가와 정가, 판매가의 관계를 구하는 유형입니다. 할인율과 이익률의 기준 금액을 구분해야 합니다.",
         kinds: [
           kind(
             "math-price-profit",
-            "할인·이익",
+            "할인과 이익",
             "원가와 정가, 판매가의 관계를 계산합니다.",
-            "원가를 100으로 두고 이익률을 먼저, 정가를 100으로 두고 할인율을 따로 적용해 기준을 섞지 않습니다.",
+            "이익률의 기준은 원가이므로 원가에 1과 이익률의 합을 곱해 판매가를 구합니다.",
           ),
         ],
       },
       {
         id: "counting",
         name: "경우의 수",
-        description: "순서·선택·배치 조건에 맞는 계산법을 고릅니다.",
+        description:
+          "선택하거나 배치할 수 있는 경우의 수를 구하는 유형입니다. 순서의 유무와 동시에 일어나는 조건을 먼저 구분해야 합니다.",
         kinds: [
           kind(
             "math-count-sum-product",
-            "합의 법칙·곱의 법칙",
+            "합의 법칙과 곱의 법칙",
             "동시에 일어나는지 나뉘어 일어나는지 구분합니다.",
             "경우가 서로 겹치지 않으면 더하고, 단계가 연속되면 각 단계의 수를 곱합니다.",
           ),
@@ -407,7 +431,7 @@ export const CATEGORIES: Category[] = [
             "math-count-separated",
             "서로 붙지 않는 배치",
             "특정 대상들이 이웃하지 않게 배치합니다.",
-            "제약 없는 대상을 먼저 세워 생긴 빈칸에 제한 대상을 선택해 넣습니다.",
+            "전체 배열에서 제한 대상이 붙어 있는 배열을 빼면 서로 붙지 않는 배열을 빠르게 구할 수 있습니다.",
           ),
           kind(
             "math-count-group",
@@ -418,7 +442,7 @@ export const CATEGORIES: Category[] = [
           kind(
             "math-count-select",
             "특정인 선정",
-            "반드시 포함·제외되는 사람 조건을 처리합니다.",
+            "반드시 포함되거나 제외되는 사람 조건을 처리합니다.",
             "적어도 한 명 조건은 전체에서 한 명도 뽑히지 않는 여사건을 빼는 방식이 빠릅니다.",
           ),
           kind(
@@ -432,7 +456,8 @@ export const CATEGORIES: Category[] = [
       {
         id: "probability",
         name: "확률",
-        description: "전체 경우와 조건을 만족하는 경우의 비율을 구합니다.",
+        description:
+          "전체 경우 중 조건을 만족하는 경우의 비율을 구하는 유형입니다. 직접 세기 복잡하면 반대 사건부터 확인해야 합니다.",
         kinds: [
           kind(
             "math-probability-basic",
@@ -450,8 +475,9 @@ export const CATEGORIES: Category[] = [
       },
       {
         id: "distance-speed-time",
-        name: "거리·속력·시간",
-        description: "세 값의 관계와 상대속도를 상황별로 적용합니다.",
+        name: "거리와 속력, 시간",
+        description:
+          "거리와 속력, 시간의 관계를 이용하는 유형입니다. 이동 방향에 따라 속력의 합과 차를 구분해야 합니다.",
         kinds: [
           kind(
             "math-distance-same",
@@ -461,13 +487,13 @@ export const CATEGORIES: Category[] = [
           ),
           kind(
             "math-distance-train",
-            "기차·터널",
+            "기차와 터널",
             "기차가 터널이나 사람을 통과하는 시간을 구합니다.",
-            "완전히 통과하면 기차 길이와 대상 길이를 더하고, 보이지 않는 시간은 터널 길이에서 기차 길이를 뺍니다.",
+            "기차가 터널을 완전히 통과할 때 이동 거리는 기차 길이와 터널 길이의 합입니다.",
           ),
           kind(
             "math-distance-relative",
-            "만남·추월",
+            "만남과 추월",
             "두 대상의 상대속력으로 시간을 구합니다.",
             "반대 방향은 속력을 더하고 같은 방향 추월은 속력 차이를 사용합니다.",
           ),
@@ -476,19 +502,20 @@ export const CATEGORIES: Category[] = [
       {
         id: "work-rate",
         name: "일률",
-        description: "전체 작업량을 각 대상의 시간당 작업량으로 나눕니다.",
+        description:
+          "여러 대상이 일을 끝내는 시간을 구하는 유형입니다. 전체 작업량을 정하고 각 대상의 시간당 작업량을 계산해야 합니다.",
         kinds: [
           kind(
             "math-work-single",
             "단독 작업",
             "한 대상의 작업 속도를 구합니다.",
-            "전체 작업량을 완료 시간들의 최소공배수로 두면 분수 계산을 피할 수 있습니다.",
+            "전체 작업량을 1로 놓고 완료 시간으로 나누면 하루 작업량을 바로 구할 수 있습니다.",
           ),
           kind(
             "math-work-together",
             "협력 작업",
             "여러 대상이 함께 일하는 시간을 구합니다.",
-            "각자의 한 시간 작업량을 더한 뒤 전체 작업량을 합산 속도로 나눕니다.",
+            "각자의 단위 시간당 작업량을 더한 뒤 전체 작업량을 합산 속도로 나눕니다.",
           ),
           kind(
             "math-work-partial",
@@ -507,12 +534,13 @@ export const CATEGORIES: Category[] = [
       {
         id: "other-math",
         name: "기타 응용수리",
-        description: "나이와 과부족 조건을 방정식으로 바꿉니다.",
+        description:
+          "나이와 과부족 조건을 식으로 바꾸는 유형입니다. 같은 시점의 수량끼리 비교하고 마지막 묶음의 조건을 확인해야 합니다.",
         kinds: [
           kind(
             "math-age",
             "나이",
-            "현재와 과거·미래의 나이 관계를 구합니다.",
+            "현재와 과거, 미래의 나이 관계를 구합니다.",
             "현재 나이를 변수로 두고 몇 년 후에는 두 사람 모두 같은 수만큼 더해진다는 점을 식에 반영합니다.",
           ),
           kind(
@@ -531,12 +559,14 @@ export const CATEGORIES: Category[] = [
     number: "04",
     name: "언어추리",
     color: "#5f8f6b",
-    description: "책 6부의 명제와 조건추리 도식화 유형을 기준으로 분류했습니다.",
+    description:
+      "명제와 여러 조건을 연결해 반드시 참인 결론을 찾는 영역입니다. 조건을 짧게 기호화하고 확정되는 정보부터 정리해야 합니다.",
     subtypes: [
       {
         id: "proposition",
         name: "명제",
-        description: "모든·어떤 명제를 기호화하고 삼단논법으로 연결합니다.",
+        description:
+          "여러 명제를 연결해 결론이나 빠진 전제를 찾는 유형입니다. 모든 명제의 방향과 어떤 명제의 존재 관계를 구분해야 합니다.",
         kinds: [
           kind(
             "logic-conclusion-blank",
@@ -546,13 +576,13 @@ export const CATEGORIES: Category[] = [
           ),
           kind(
             "logic-premise-small",
-            "전제 빈칸 - 작은 것 겹침",
+            "전제 빈칸 작은 것 겹침",
             "결론의 작은 집합이 전제와 겹치는 경우를 풉니다.",
             "결론에서 작은 집합을 먼저 찾아 같은 출발점을 가진 전제를 대입합니다.",
           ),
           kind(
             "logic-premise-large",
-            "전제 빈칸 - 큰 것 겹침",
+            "전제 빈칸 큰 것 겹침",
             "결론의 큰 집합이 전제와 겹치는 경우를 풉니다.",
             "도착 집합을 고정하고 그 집합으로 이어지는 화살표의 시작점을 역으로 찾습니다.",
           ),
@@ -560,17 +590,17 @@ export const CATEGORIES: Category[] = [
             "logic-chain",
             "복수 명제 연결",
             "2~5개의 명제를 연쇄적으로 연결합니다.",
-            "마지막 확정 조건에서 시작해 대우를 포함한 관련 명제만 역순으로 연결합니다.",
+            "현재 참이라고 확정된 명제에서 시작해 화살표 방향으로 연결하고 필요한 경우에만 대우를 사용합니다.",
           ),
           kind(
             "logic-some-amo",
-            "어떤 명제 - 어모어",
+            "어떤–모든 명제 연결",
             "어떤 두 개와 모든 한 개가 포함된 관계를 판단합니다.",
             "어떤의 존재 관계를 먼저 표시하고, 모든 명제가 그 관계를 확장할 때만 결론을 확정합니다.",
           ),
           kind(
             "logic-some-mmo",
-            "어떤 명제 - 모모어",
+            "전칭 명제와 존재 조건",
             "모든 두 개와 어떤 한 개가 포함된 관계를 판단합니다.",
             "모든 관계의 방향을 먼저 하나로 연결한 뒤 어떤 대상이 놓일 수 있는 범위를 확인합니다.",
           ),
@@ -579,13 +609,14 @@ export const CATEGORIES: Category[] = [
       {
         id: "conditional",
         name: "조건추리",
-        description: "조건을 기호화하고 확정되는 자리부터 배치합니다.",
+        description:
+          "순서와 자리, 숫자와 참거짓 조건을 만족하도록 배치하는 유형입니다. 고정 조건과 불가능한 경우를 먼저 표시해야 합니다.",
         kinds: [
           kind(
             "logic-linear",
             "일렬 배치",
             "순서나 자리를 일렬로 정합니다.",
-            "A>B 같은 선후 관계를 묶고, 고정 자리와 긴 연결 묶음부터 배치합니다.",
+            "선후 관계를 하나의 연결 묶음으로 만들고 바로 앞뒤 조건과 고정 자리부터 배치합니다.",
           ),
           kind(
             "logic-item",
@@ -597,7 +628,7 @@ export const CATEGORIES: Category[] = [
             "logic-number",
             "숫자 배치",
             "각 대상에게 서로 다른 숫자를 할당합니다.",
-            "최댓값·최솟값과 합 조건으로 가능한 범위를 줄인 뒤 남은 숫자를 배치합니다.",
+            "최댓값과 최솟값, 합 조건으로 가능한 범위를 줄인 뒤 남은 숫자를 배치합니다.",
           ),
           kind(
             "logic-truth",
@@ -615,12 +646,14 @@ export const CATEGORIES: Category[] = [
     number: "05",
     name: "수열추리",
     color: "#6f6aa8",
-    description: "책 7부의 규칙 탐색 순서와 자주 나오는 수열 규칙을 기준으로 분류했습니다.",
+    description:
+      "수의 변화 규칙을 찾아 빈칸이나 다음 항을 구하는 영역입니다. 차이와 비율을 먼저 보고 반복되는 연산을 확인해야 합니다.",
     subtypes: [
       {
         id: "integer-sequence",
         name: "정수 수열",
-        description: "차이·비율·위치·반복 패턴을 순서대로 확인합니다.",
+        description:
+          "정수 사이의 규칙을 찾아 다음 수를 구하는 유형입니다. 인접한 항의 차이와 비율을 차례로 확인해야 합니다.",
         kinds: [
           kind(
             "sequence-arithmetic",
@@ -642,7 +675,7 @@ export const CATEGORIES: Category[] = [
           ),
           kind(
             "sequence-power",
-            "제곱수·세제곱수",
+            "제곱수와 세제곱수",
             "제곱수나 세제곱수의 변형을 찾습니다.",
             "4, 9, 16, 25처럼 익숙한 제곱수 근처의 ±1 변형인지 먼저 봅니다.",
           ),
@@ -668,8 +701,9 @@ export const CATEGORIES: Category[] = [
       },
       {
         id: "fraction-decimal",
-        name: "분수·소수 수열",
-        description: "분자·분모 또는 정수·소수 부분을 나눠 규칙을 찾습니다.",
+        name: "분수와 소수 수열",
+        description:
+          "분수나 소수의 변화 규칙을 찾는 유형입니다. 분자와 분모, 정수부와 소수부를 나누어 확인해야 합니다.",
         kinds: [
           kind(
             "sequence-fraction",
@@ -681,7 +715,7 @@ export const CATEGORIES: Category[] = [
             "sequence-decimal",
             "소수 수열",
             "정수부와 소수부 또는 자릿수 이동을 확인합니다.",
-            "소수점을 없애 같은 자릿수의 정수로 만든 뒤 차이와 비율을 확인합니다.",
+            "소수점을 유지한 채 앞 항으로 나눈 비율을 확인하고 같은 배수가 반복되는지 봅니다.",
           ),
         ],
       },
