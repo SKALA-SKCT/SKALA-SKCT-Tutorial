@@ -29,6 +29,18 @@ export interface Step {
   reveal?: boolean;
 }
 
+/** A data table for 자료해석-style problems (rendered above the passage). */
+export interface DataTable {
+  /** Optional caption, e.g. "<표> 연도별 제품 판매량". */
+  title?: string;
+  /** Optional unit note, e.g. "단위: 천 개". */
+  unit?: string;
+  /** Header cells; the first is the row-label column header. */
+  columns: string[];
+  /** Each row as [rowLabel, ...cells], aligned to `columns`. */
+  rows: string[][];
+}
+
 export interface Problem {
   id: string;
   type: ProblemType;
@@ -44,6 +56,8 @@ export interface Problem {
   stem: string;
   /** <보기> content for insertion-type problems. */
   box?: string;
+  /** Optional data table rendered above the passage (자료해석). */
+  table?: DataTable;
   passage: Segment[];
   choices: Choice[];
   answerId: string;

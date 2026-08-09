@@ -2007,3 +2007,46 @@ button {
     min-height: 72px;
   }
 }
+
+/* 자료해석 data table (rendered inside the tutorial problem card) */
+.tutorial-problem-content .data-table {
+  margin: 0 0 18px;
+}
+.data-table-title {
+  text-align: center;
+  font-weight: 700;
+  font-size: 14px;
+  color: #27272a;
+  margin: 0 0 4px;
+}
+.data-table-unit {
+  text-align: right;
+  font-size: 12px;
+  color: #71717a;
+  margin: 0 0 6px;
+}
+.data-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.data-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  color: #27272a;
+}
+.data-table th,
+.data-table td {
+  border: 1px solid #d4d4d8;
+  padding: 7px 10px;
+  text-align: center;
+  white-space: nowrap;
+}
+.data-table thead th {
+  background: #f4f4f5;
+  font-weight: 700;
+}
+.data-table tbody th {
+  background: #fafafa;
+  font-weight: 600;
+}

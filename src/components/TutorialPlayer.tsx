@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Problem } from "../types";
 import Passage from "./Passage";
+import DataTableView from "./DataTable";
 import Choices from "./Choices";
 import ExamHeader from "./ExamHeader";
 import ExamTools from "./exam/ExamTools";
@@ -95,6 +96,8 @@ export default function TutorialPlayer({ problems, subtypeName, title, onBack }:
                 <h2>{problem.stem}</h2>
               </div>
 
+              {problem.table && <DataTableView table={problem.table} />}
+
               {problem.box && (
                 <div className={`box${step.highlightBox ? " active" : ""}`}>
                   <span className="box-label">&lt;보기&gt;</span>
@@ -102,7 +105,9 @@ export default function TutorialPlayer({ problems, subtypeName, title, onBack }:
                 </div>
               )}
 
-              <Passage segments={problem.passage} activeIds={activeIds} dimmed={dimmed} />
+              {problem.passage.length > 0 && (
+                <Passage segments={problem.passage} activeIds={activeIds} dimmed={dimmed} />
+              )}
 
               <Choices
                 choices={problem.choices}
