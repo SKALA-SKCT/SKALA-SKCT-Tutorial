@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Problem } from "../types";
 import Passage from "./Passage";
+import ProblemVisuals from "./ProblemVisuals";
 import DataTableView from "./DataTable";
 import Choices from "./Choices";
 import ExamHeader from "./ExamHeader";
@@ -8,7 +9,7 @@ import ExamTools from "./exam/ExamTools";
 
 interface Props {
   problems: Problem[];
-  subtypeName: string;
+  subtypeName?: string;
   title: string;
   onBack: () => void;
 }
@@ -19,7 +20,6 @@ export default function TutorialPlayer({ problems, subtypeName, title, onBack }:
   const [zoom, setZoom] = useState(100);
   const problem = problems[problemIndex];
   const step = problem.steps[stepIndex];
-  const internalTypeName = problem.internalTypeName;
   const selectProblem = (index: number) => {
     setProblemIndex(index);
     setStepIndex(0);
@@ -29,7 +29,8 @@ export default function TutorialPlayer({ problems, subtypeName, title, onBack }:
   const revealed = problem.steps.slice(0, stepIndex + 1).some((s) => s.reveal);
 
   const activeIds = step.highlight ?? [];
-  const dimmed = activeIds.length > 0 || Boolean(step.highlightBox);
+  const activeVisualIds = step.highlightVisual ?? [];
+  const dimmed = activeIds.length > 0 || activeVisualIds.length > 0 || Boolean(step.highlightBox);
 
   return (
     <div className="player exam-screen">
@@ -70,25 +71,31 @@ export default function TutorialPlayer({ problems, subtypeName, title, onBack }:
         </aside>
 
         <div className="exam-question-column">
-          <nav className="tutorial-question-nav" aria-label="튜토리얼 유형 이동">
-            {problems.map((item, index) => (
-              <button
-                type="button"
-                className={index === problemIndex ? "active" : ""}
-                key={item.id}
-                aria-label={`${index + 1}번 유형`}
-                aria-current={index === problemIndex ? "page" : undefined}
-                onClick={() => selectProblem(index)}
-              >
-                {index + 1}
-              </button>
-            ))}
-          </nav>
+          {problems.length > 1 && (
+            <nav className="tutorial-question-nav" aria-label="튜토리얼 유형 이동">
+              {problems.map((item, index) => (
+                <button
+                  type="button"
+                  className={index === problemIndex ? "active" : ""}
+                  key={item.id}
+                  aria-label={`${index + 1}번 유형`}
+                  aria-current={index === problemIndex ? "page" : undefined}
+                  onClick={() => selectProblem(index)}
+                >
+                  {index + 1}
+                </button>
+              ))}
+            </nav>
+          )}
           <div className="exam-question-card">
             <div className="exam-question-label">
               <span>
-                {subtypeName} {problemIndex + 1}/{problems.length}
-                <small className="tutorial-internal-label">{internalTypeName}</small>
+                {subtypeName && problems.length > 1
+                  ? `${subtypeName} ${problemIndex + 1}/${problems.length}`
+                  : problem.typeLabel}
+                {subtypeName && problems.length > 1 && (
+                  <small className="tutorial-internal-label">{problem.internalTypeName}</small>
+                )}
               </span>
             </div>
             <div className="tutorial-problem-content">
@@ -105,8 +112,21 @@ export default function TutorialPlayer({ problems, subtypeName, title, onBack }:
                 </div>
               )}
 
+              {problem.visuals && (
+                <ProblemVisuals
+                  visuals={problem.visuals}
+                  activeIds={activeVisualIds}
+                  dimmed={dimmed}
+                />
+              )}
+
               {problem.passage.length > 0 && (
-                <Passage segments={problem.passage} activeIds={activeIds} dimmed={dimmed} />
+                <Passage
+                  segments={problem.passage}
+                  activeIds={activeIds}
+                  dimmed={dimmed}
+                  label={problem.passageLabel}
+                />
               )}
 
               <Choices
@@ -122,8 +142,8 @@ export default function TutorialPlayer({ problems, subtypeName, title, onBack }:
         <ExamTools
           resetKey={`${problem.id}:${stepIndex}`}
           onExit={onBack}
-          onPrevious={() => selectProblem(problemIndex - 1)}
-          onNext={() => selectProblem(problemIndex + 1)}
+          onPrevious={problems.length > 1 ? () => selectProblem(problemIndex - 1) : undefined}
+          onNext={problems.length > 1 ? () => selectProblem(problemIndex + 1) : undefined}
           previousDisabled={problemIndex === 0}
           nextDisabled={problemIndex === problems.length - 1}
         />

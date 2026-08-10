@@ -1,20 +1,18 @@
 # SKCT 유형별 풀이 튜토리얼
 
-SKCT 언어 영역 문제를 **유형별로 "어떻게 접근하고 어떤 순서로 읽어야 하는지"** 단계별로
-안내하는 학습용 샘플 앱입니다. `다음 →` 버튼을 누를 때마다 해설이 한 단계씩 공개되고,
-그 단계에서 봐야 할 지문 문장이 형광펜처럼 강조됩니다.
+SKCT의 출제 분류와 풀이 전략을 기준으로 **언어이해, 자료해석, 창의수리, 언어추리,
+수열추리**를 단계별로 학습하는 튜토리얼 앱입니다. 흐름은 다음과 같습니다.
 
-현재 두 가지 유형이 샘플로 들어 있습니다.
+`5개 영역, 21개 문제 유형, 풀이 튜토리얼, 유형별 예시문제`
 
-| 유형                     | 공략 포인트                                                                            |
-| ------------------------ | -------------------------------------------------------------------------------------- |
-| **빈칸 1개 (빈칸 추론)** | 선지보다 **지문을 먼저** 읽고, 빈칸 뒤의 구체적 설명에서 근거를 찾습니다.              |
-| **문장 삽입 (위치 A~E)** | **`<보기>`를 먼저** 읽고, 보기 속 단서(접속어·지시어·키워드)로 들어갈 자리를 찾습니다. |
+현재 21개 문제 유형마다 풀이 튜토리얼과 독립적인 예시문제 20문항이 연결되어 있습니다.
+영역 랜덤은 해당 영역의 문제 유형을 균등하게 섞고, 완전 랜덤은 5개 영역에서 각각
+4문항씩 출제합니다.
 
 ## 기술 스택
 
-- **Vite + React (TypeScript)** — 프론트엔드
-- **Cloudflare Workers + Static Assets** (`@cloudflare/vite-plugin`) — 배포
+- **Vite + React (TypeScript)** 프론트엔드
+- **Cloudflare Workers + Static Assets** (`@cloudflare/vite-plugin`) 배포
   - 정적 React 앱을 Worker가 서빙하고, `worker/index.ts`의 `/api/*` 자리는
     향후 **Claude API로 해설을 자동 생성**하는 백엔드를 얹을 공간입니다.
 
@@ -22,7 +20,7 @@ SKCT 언어 영역 문제를 **유형별로 "어떻게 접근하고 어떤 순�
 
 ```bash
 npm install
-npm run dev      # 개발 서버 (Vite + workerd) — http://localhost:5173
+npm run dev      # 개발 서버 (Vite + workerd) http://localhost:5173
 ```
 
 ## 빌드 / 배포
@@ -36,7 +34,10 @@ npm run deploy   # build 후 wrangler deploy (최초 1회 `npx wrangler login` �
 
 ```
 src/
-  data/problems.ts     # ★ 문제 + 단계별 해설 데이터 (여기만 고치면 문제 추가)
+  data/catalog.ts      # 5개 영역의 화면 정보
+  data/tutorials/      # 21개 튜토리얼 문제와 단계별 해설
+  data/exampleQuestions.ts # 21개 유형별 예시문제 420문항
+  data/problems.ts     # 튜토리얼 문제 진입점
   types.ts             # Problem / Segment / Step / Choice 타입
   components/
     Home.tsx           # 유형 목록 카드
@@ -51,7 +52,8 @@ wrangler.jsonc         # Workers 설정 (assets 바인딩, SPA fallback)
 
 ## 문제 추가하는 법
 
-`src/data/problems.ts`의 `PROBLEMS` 배열에 항목을 추가하면 됩니다.
+`src/data/tutorials/`에 문제 유형을 등록하면 해당 튜토리얼 ID를 기준으로 예시문제 세트가
+구성됩니다.
 
 1. `passage`를 **문장 단위 `Segment`** 로 쪼갭니다. 문단 시작 문장에는 `newParagraph: true`,
    삽입형의 `(A)~(E)` 자리는 `kind: "position"` 을 줍니다.

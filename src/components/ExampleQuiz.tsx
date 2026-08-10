@@ -1,164 +1,111 @@
 import { useState } from "react";
-import type { Category, Subtype } from "../data/catalog";
+import type { ExampleQuestion } from "../data/catalog";
 import { choiceMarker } from "../data/catalog";
+import { PROBLEMS } from "../data/problems";
 import ExamHeader from "./ExamHeader";
 import ExamTools from "./exam/ExamTools";
+import ProblemVisuals from "./ProblemVisuals";
+import { displayQuestionStem } from "../utils/questionText";
+
+export interface PracticeResult {
+  title: string;
+  questions: ExampleQuestion[];
+  answers: Record<string, number>;
+}
 
 export default function ExampleQuiz({
-  category,
-  subtype,
-  onBack,
+  title,
+  questions,
+  onFinish,
 }: {
-  category: Category;
-  subtype: Subtype;
-  onBack: () => void;
+  title: string;
+  questions: ExampleQuestion[];
+  onFinish: (result: PracticeResult) => void;
 }) {
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number>>({});
-  const [submitted, setSubmitted] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [zoom, setZoom] = useState(100);
-  const question = category.examples[index];
-  const selected = answers[question.id] ?? null;
-  const last = index === category.examples.length - 1;
+  const [showType, setShowType] = useState(() => !title.includes("랜덤"));
+  const [showTip, setShowTip] = useState(false);
+  const question = questions[index];
+  const selected = answers[question.id];
+  const last = index === questions.length - 1;
+  const answeredCount = Object.keys(answers).length;
+  const randomMode = title.includes("랜덤");
+  const currentTutorial = PROBLEMS.find((problem) => problem.id === question.kindId);
+
+  const finish = () => onFinish({ title, questions, answers });
   const goNext = () => {
-    if (last) {
-      setSubmitted(true);
-      return;
-    }
-    setIndex((value) => value + 1);
+    setShowTip(false);
+    if (last) finish();
+    else setIndex((value) => value + 1);
   };
-  const leaveResult = () => {
-    setShowExitConfirm(true);
+  const goPrevious = () => {
+    setShowTip(false);
+    setIndex((value) => Math.max(0, value - 1));
   };
 
-  if (submitted) {
-    const correctCount = category.examples.filter(
-      (item) => answers[item.id] === item.answer,
-    ).length;
-
-    return (
-      <section className="example-result-page exam-screen">
-        <ExamHeader
-          title={`${category.name} ${subtype.name} 예시문제 결과`}
-          zoom={zoom}
-          onZoom={setZoom}
-        />
-        <main className="example-result-content" style={{ zoom: `${zoom}%` }}>
-          <button className="btn-back" onClick={leaveResult}>
-            ← 목록으로
-          </button>
-          <header className="example-result-head">
-            <div>
-              <h1>예시문제 결과</h1>
-              <p>
-                총 {category.examples.length}문항 중 {correctCount}문항을 맞혔습니다.
-              </p>
-            </div>
-          </header>
-
-          <div className="example-review-list">
-            {category.examples.map((item, questionIndex) => {
-              const selectedAnswer = answers[item.id];
-              const correct = selectedAnswer === item.answer;
-              const status = selectedAnswer === undefined ? "미응답" : correct ? "정답" : "오답";
-              return (
-                <article className="example-review-card" key={item.id}>
-                  <div className="example-review-title">
-                    <strong>{questionIndex + 1}번</strong>
-                    <span className={correct ? "correct" : "incorrect"}>{status}</span>
-                  </div>
-                  <div className="example-review-prompt">
-                    <h2>{item.stem}</h2>
-                    {item.passage && <p>{item.passage}</p>}
-                  </div>
-                  <div className="example-review-choices">
-                    {item.choices.map((choice, choiceIndex) => {
-                      const isCorrectAnswer = choiceIndex === item.answer;
-                      const isSelected = choiceIndex === selectedAnswer;
-                      return (
-                        <div
-                          className={`${isCorrectAnswer ? "correct-answer" : ""}${isSelected && !isCorrectAnswer ? " selected-wrong" : ""}`}
-                          key={choice}
-                        >
-                          <span>{choiceMarker(choiceIndex)}</span>
-                          <p>{choice}</p>
-                          {isCorrectAnswer && <small>정답</small>}
-                          {isSelected && !isCorrectAnswer && <small>내 답</small>}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="example-review-answer">
-                    <p>
-                      내 답: {selectedAnswer === undefined ? "미응답" : choiceMarker(selectedAnswer)}
-                      <strong>정답: {choiceMarker(item.answer)}</strong>
-                    </p>
-                  </div>
-                  <div className="example-review-explanation">
-                    <strong>해설</strong>
-                    <p>{item.explanation}</p>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        </main>
-        {showExitConfirm && (
-          <div className="confirm-overlay" role="presentation">
-            <div
-              className="confirm-dialog"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="result-exit-title"
-            >
-              <h2 id="result-exit-title">목록으로 이동할까요?</h2>
-              <p>목록으로 이동하면 현재 결과는 사라지며 다시 확인할 수 없습니다.</p>
-              <div>
-                <button type="button" onClick={() => setShowExitConfirm(false)}>
-                  취소
-                </button>
-                <button type="button" className="confirm-primary" onClick={onBack}>
-                  이동하기
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </section>
-    );
-  }
   return (
     <section className="quiz-page exam-screen">
-      <ExamHeader
-        title={`${category.name} ${subtype.name} 예시문제`}
-        zoom={zoom}
-        onZoom={setZoom}
-      />
-      <div className="exam-content" style={{ zoom: `${zoom}%` }}>
+      <ExamHeader title={title} zoom={zoom} onZoom={setZoom} />
+      <div className="exam-content practice-exam-content" style={{ zoom: `${zoom}%` }}>
+        <aside className="practice-tip-panel">
+          <button
+            type="button"
+            className="practice-tip-heading"
+            aria-expanded={showTip}
+            onClick={() => setShowTip((value) => !value)}
+          >
+            <span>풀이 팁</span>
+            <svg aria-hidden="true" viewBox="0 0 20 20">
+              <path d="m6 8 4 4 4-4" />
+            </svg>
+          </button>
+          {showTip && (
+            <p>{currentTutorial?.strategy ?? "문제의 조건과 질문을 먼저 구분해 확인하세요."}</p>
+          )}
+        </aside>
         <div className="exam-question-column">
           <article className="exam-question-card">
-            <div className="exam-question-label">
-              <span>
-                {category.name} 영역 {index + 1} <small>/ {category.examples.length}</small>
-              </span>
+            <div className="exam-question-label practice-question-label">
+              <div>
+                <span>{randomMode && !showType ? "문제" : question.typeLabel}</span>
+                {randomMode && (
+                  <button type="button" onClick={() => setShowType((value) => !value)}>
+                    {showType ? "유형 숨기기" : "유형 보기"}
+                  </button>
+                )}
+              </div>
+              <strong className="practice-question-progress">
+                {index + 1} <small>/ {questions.length}</small>
+              </strong>
             </div>
             <div className="exam-prompt">
-              <h2>{question.stem}</h2>
-              {question.passage && <p>{question.passage}</p>}
+              <h2>{displayQuestionStem(question.stem)}</h2>
             </div>
+            {question.box && (
+              <div className="box practice-box">
+                <span className="box-label">&lt;보기&gt;</span>
+                <p>{question.box}</p>
+              </div>
+            )}
+            {question.visuals && (
+              <ProblemVisuals visuals={question.visuals} activeIds={[]} dimmed={false} />
+            )}
+            {question.passage && (
+              <div className="practice-passage">
+                {question.passageLabel && <strong>&lt;{question.passageLabel}&gt;</strong>}
+                <p>{question.passage}</p>
+              </div>
+            )}
             <div className="quiz-choices">
               {question.choices.map((choice, choiceIndex) => (
                 <button
-                  key={choice}
+                  key={`${choiceIndex}-${choice}`}
                   className={selected === choiceIndex ? "selected" : ""}
                   onClick={() =>
-                    setAnswers((current) => {
-                      const next = { ...current };
-                      if (current[question.id] === choiceIndex) delete next[question.id];
-                      else next[question.id] = choiceIndex;
-                      return next;
-                    })
+                    setAnswers((current) => ({ ...current, [question.id]: choiceIndex }))
                   }
                 >
                   <span>{choiceMarker(choiceIndex)}</span>
@@ -166,15 +113,42 @@ export default function ExampleQuiz({
                 </button>
               ))}
             </div>
-            <div className="exam-question-actions">
-              <button className="exam-next-button" onClick={goNext}>
-                {last ? "제출" : "다음 →"}
-              </button>
+            <div className="exam-question-actions practice-actions">
+              <div>
+                {index > 0 && <button onClick={goPrevious}>← 이전</button>}
+                <button className="exam-next-button" onClick={goNext}>
+                  {last ? "결과 보기" : "다음 →"}
+                </button>
+              </div>
             </div>
           </article>
         </div>
-        <ExamTools resetKey={question.id ?? `${subtype.id}:${index}`} onExit={onBack} />
+        <ExamTools resetKey={question.id} onExit={() => setShowExitConfirm(true)} />
       </div>
+      {showExitConfirm && (
+        <div className="confirm-overlay" role="presentation">
+          <div
+            className="confirm-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="practice-exit-title"
+          >
+            <h2 id="practice-exit-title">여기까지 채점할까요?</h2>
+            <p>
+              응답한 {answeredCount}문항만 결과에 표시됩니다. 결과를 나가면 기록은 저장되지
+              않습니다.
+            </p>
+            <div>
+              <button type="button" onClick={() => setShowExitConfirm(false)}>
+                계속 풀기
+              </button>
+              <button type="button" className="confirm-primary" onClick={finish}>
+                응시 종료
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

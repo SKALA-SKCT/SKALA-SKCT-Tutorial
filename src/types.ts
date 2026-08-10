@@ -1,4 +1,4 @@
-export type ProblemType = "single-blank" | "insertion";
+export type ProblemType = "standard" | "single-blank" | "insertion";
 
 /** One chunk of the passage. Sentences flow inline; positions render as pills. */
 export interface Segment {
@@ -25,19 +25,57 @@ export interface Step {
   highlightBox?: boolean;
   /** Choice ids to spotlight (e.g. while evaluating options). */
   highlightChoices?: string[];
+  /** Table cells, rows, or chart series to spotlight. */
+  highlightVisual?: string[];
   /** Once reached, the correct choice is marked as the answer. */
   reveal?: boolean;
 }
 
-/** A data table for 자료해석-style problems (rendered above the passage). */
-export interface DataTable {
-  /** Optional caption, e.g. "<표> 연도별 제품 판매량". */
-  title?: string;
-  /** Optional unit note, e.g. "단위: 천 개". */
+export interface ProblemTable {
+  type: "table";
+  id: string;
+  title: string;
   unit?: string;
-  /** Header cells; the first is the row-label column header. */
   columns: string[];
-  /** Each row as [rowLabel, ...cells], aligned to `columns`. */
+  rows: {
+    id: string;
+    label: string;
+    cells: Array<string | number>;
+  }[];
+  note?: string;
+}
+
+export interface ProblemBarChart {
+  type: "bar-chart";
+  id: string;
+  title: string;
+  unit?: string;
+  categories: string[];
+  series: {
+    id: string;
+    name: string;
+    values: number[];
+    color?: string;
+  }[];
+}
+
+export interface ProblemSequence {
+  type: "sequence";
+  id: string;
+  title: string;
+  items: {
+    id: string;
+    value: string;
+  }[];
+}
+
+export type ProblemVisual = ProblemTable | ProblemBarChart | ProblemSequence;
+
+/** 메인 브랜치 튜토리얼에서 사용하는 단순 표 형식입니다. */
+export interface DataTable {
+  title?: string;
+  unit?: string;
+  columns: string[];
   rows: string[][];
 }
 
@@ -56,7 +94,11 @@ export interface Problem {
   stem: string;
   /** <보기> content for insertion-type problems. */
   box?: string;
-  /** Optional data table rendered above the passage (자료해석). */
+  /** Label shown above a structured passage, such as <조건>. */
+  passageLabel?: string;
+  /** Structured source material shown as an actual table or graph. */
+  visuals?: ProblemVisual[];
+  /** 메인 브랜치의 자료해석 튜토리얼에서 사용하는 표입니다. */
   table?: DataTable;
   passage: Segment[];
   choices: Choice[];
