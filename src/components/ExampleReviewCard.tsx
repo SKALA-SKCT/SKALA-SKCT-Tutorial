@@ -1,5 +1,6 @@
 import { choiceMarker, type ExampleQuestion } from "../data/catalog";
 import ProblemVisuals from "./ProblemVisuals";
+import { displayQuestionStem } from "../utils/questionText";
 
 interface ExampleReviewCardProps {
   question: ExampleQuestion;
@@ -40,7 +41,7 @@ export default function ExampleReviewCard({
                 : question.typeLabel?.split(" / ").slice(1).join(" / ")}
             </small>
           )}
-          <p>{question.stem}</p>
+          <p>{displayQuestionStem(question.stem)}</p>
         </div>
         <span className={isCorrect ? "correct" : answered ? "incorrect" : "unanswered"}>
           {isCorrect ? "정답" : answered ? "오답" : "미응답"}

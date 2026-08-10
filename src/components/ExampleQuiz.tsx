@@ -1,9 +1,11 @@
 import { useState } from "react";
 import type { ExampleQuestion } from "../data/catalog";
-import { CATEGORIES, choiceMarker } from "../data/catalog";
+import { choiceMarker } from "../data/catalog";
+import { PROBLEMS } from "../data/problems";
 import ExamHeader from "./ExamHeader";
 import ExamTools from "./exam/ExamTools";
 import ProblemVisuals from "./ProblemVisuals";
+import { displayQuestionStem } from "../utils/questionText";
 
 export interface PracticeResult {
   title: string;
@@ -31,13 +33,18 @@ export default function ExampleQuiz({
   const last = index === questions.length - 1;
   const answeredCount = Object.keys(answers).length;
   const randomMode = title.includes("랜덤");
-  const currentKind = CATEGORIES.flatMap((category) => category.subtypes)
-    .flatMap((subtype) => subtype.kinds)
-    .find((kind) => kind.id === question.kindId);
+  const currentTutorial = PROBLEMS.find((problem) => problem.id === question.kindId);
 
   const finish = () => onFinish({ title, questions, answers });
-  const goNext = () => (last ? finish() : setIndex((value) => value + 1));
-  const goPrevious = () => setIndex((value) => Math.max(0, value - 1));
+  const goNext = () => {
+    setShowTip(false);
+    if (last) finish();
+    else setIndex((value) => value + 1);
+  };
+  const goPrevious = () => {
+    setShowTip(false);
+    setIndex((value) => Math.max(0, value - 1));
+  };
 
   return (
     <section className="quiz-page exam-screen">
@@ -46,16 +53,18 @@ export default function ExampleQuiz({
         <aside className="practice-tip-panel">
           <button
             type="button"
-            className="practice-tip-toggle"
+            className="practice-tip-heading"
             aria-expanded={showTip}
             onClick={() => setShowTip((value) => !value)}
           >
-            <span>TIP</span>
+            <span>풀이 팁</span>
             <svg aria-hidden="true" viewBox="0 0 20 20">
               <path d="m6 8 4 4 4-4" />
             </svg>
           </button>
-          {showTip && <p>{currentKind?.tip ?? "문제의 조건과 질문을 먼저 구분해 확인하세요."}</p>}
+          {showTip && (
+            <p>{currentTutorial?.strategy ?? "문제의 조건과 질문을 먼저 구분해 확인하세요."}</p>
+          )}
         </aside>
         <div className="exam-question-column">
           <article className="exam-question-card">
@@ -73,7 +82,7 @@ export default function ExampleQuiz({
               </strong>
             </div>
             <div className="exam-prompt">
-              <h2>{question.stem}</h2>
+              <h2>{displayQuestionStem(question.stem)}</h2>
             </div>
             {question.box && (
               <div className="box practice-box">

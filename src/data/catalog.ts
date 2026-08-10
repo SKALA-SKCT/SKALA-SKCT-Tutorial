@@ -49,63 +49,11 @@ const kind = (id: string, name: string, description: string, tip: string): Probl
 });
 
 const examples: Record<string, ExampleQuestion[]> = {
-  verbal: [
-    {
-      id: "v1",
-      stem: "다음 글의 중심 내용으로 가장 적절한 것은?",
-      passage:
-        "기술의 도입 여부는 기능의 수보다 사용자가 실제로 해결할 수 있는 문제를 기준으로 판단해야 한다.",
-      choices: [
-        "기능은 많을수록 좋다",
-        "기술은 실제 문제 해결을 기준으로 평가해야 한다",
-        "새 기술은 즉시 도입해야 한다",
-        "사용자는 기술을 평가할 수 없다",
-        "기능 수는 비용과 무관하다",
-      ],
-      answer: 1,
-      explanation: "글은 기술의 기능 수가 아니라 실제 문제 해결 여부를 평가 기준으로 제시합니다.",
-    },
-  ],
-  data: [
-    {
-      id: "d1",
-      stem: "A 제품의 전년 대비 증가율은?",
-      passage: "2024년 120개, 2025년 150개",
-      choices: ["15%", "20%", "25%", "30%", "35%"],
-      answer: 2,
-      explanation: "증가량 30을 기준값 120으로 나누면 25%입니다.",
-    },
-  ],
-  math: [
-    {
-      id: "m1",
-      stem: "10% 소금물 300g에 물 200g을 넣으면 농도는?",
-      passage: "소금의 양은 변하지 않는다.",
-      choices: ["4%", "5%", "6%", "8%", "10%"],
-      answer: 2,
-      explanation: "소금 30g을 전체 500g으로 나누면 6%입니다.",
-    },
-  ],
-  logic: [
-    {
-      id: "l1",
-      stem: "A가 B보다 앞이고 B가 C보다 앞일 때 반드시 참인 것은?",
-      passage: "세 사람은 한 줄로 선다.",
-      choices: ["C가 A보다 앞이다", "A가 C보다 앞이다", "B가 첫째다", "C가 둘째다", "알 수 없다"],
-      answer: 1,
-      explanation: "A가 B보다 앞이고 B가 C보다 앞이라는 관계가 연결되므로 A가 C보다 앞입니다.",
-    },
-  ],
-  sequence: [
-    {
-      id: "s1",
-      stem: "다음 수열의 빈칸에 들어갈 수는?",
-      passage: "3, 7, 11, 15, (   )",
-      choices: ["17", "18", "19", "20", "21"],
-      answer: 2,
-      explanation: "매번 4씩 증가하므로 다음 수는 19입니다.",
-    },
-  ],
+  verbal: [],
+  data: [],
+  math: [],
+  logic: [],
+  sequence: [],
 };
 
 export const CATEGORIES: Category[] = [

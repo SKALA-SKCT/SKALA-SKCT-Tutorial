@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { PROBLEMS } from "./data/problems";
 import { CATEGORIES, type ExampleQuestion, type ProblemKind, type Subtype } from "./data/catalog";
-import { questionsForCategory, questionsForKind } from "./data/exampleQuestions";
+import {
+  balancedAllQuestions,
+  balancedCategoryQuestions,
+  questionsForTutorial,
+} from "./data/tutorialQuestionGroups";
 import Home from "./components/Home";
 import TutorialPlayer from "./components/TutorialPlayer";
 import SiteHeader from "./components/SiteHeader";
@@ -10,7 +14,6 @@ import StudyHub from "./components/StudyHub";
 import ExampleQuiz, { type PracticeResult } from "./components/ExampleQuiz";
 import ExampleResult from "./components/ExampleResult";
 import RandomHub from "./components/RandomHub";
-import { shuffled } from "./utils/array";
 
 type RouteMode = "tutorial" | "examples" | "result" | null;
 interface RouteState {
@@ -27,24 +30,38 @@ interface PracticeSession {
   resultPath: string;
 }
 
-const categoryRandomSet = (categoryId: string, count = 20) => {
-  const groups = Object.values(
-    questionsForCategory(categoryId).reduce<Record<string, ExampleQuestion[]>>(
-      (current, question) => {
-        (current[question.kindId ?? "unknown"] ??= []).push(question);
-        return current;
-      },
-      {},
-    ),
-  ).map(shuffled);
-  const order = shuffled(groups);
-  return shuffled(
-    Array.from(
-      { length: count },
-      (_, index) => order[index % order.length][Math.floor(index / order.length)],
-    ),
-  );
+const tutorialPrefixByCategory: Record<string, string> = {
+  "verbal-comprehension": "vc-",
+  "data-analysis": "da-",
+  "creative-math": "cm-",
+  "verbal-reasoning": "vr-",
+  "sequence-reasoning": "sr-",
 };
+
+const TUTORIAL_CATEGORIES = CATEGORIES.map((category) => {
+  const prefix = tutorialPrefixByCategory[category.id];
+  const kinds: ProblemKind[] = PROBLEMS.filter(
+    (problem) => prefix && problem.id.startsWith(prefix),
+  ).map((problem) => ({
+    id: problem.id,
+    name: problem.internalTypeName,
+    description: problem.typeSummary,
+    tip: problem.strategy,
+    tutorialId: problem.id,
+  }));
+
+  return {
+    ...category,
+    subtypes: [
+      {
+        id: `${category.id}-tutorials`,
+        name: `${category.name} 문제 유형`,
+        description: category.description,
+        kinds,
+      },
+    ],
+  };
+});
 
 function Page({
   route,
@@ -76,10 +93,10 @@ function Page({
       return <ExampleResult result={result} onLeave={leaveResult} />;
     return (
       <RandomHub
-        categories={CATEGORIES}
+        categories={TUTORIAL_CATEGORIES}
         onBack={() => navigate("/")}
         onSelect={(category) => {
-          const questions = categoryRandomSet(category.id);
+          const questions = balancedCategoryQuestions(category.id);
           startPractice({
             title: `${category.name} 랜덤 예시문제`,
             questions,
@@ -89,9 +106,7 @@ function Page({
           navigate(`/random/${category.id}/examples`);
         }}
         onAll={() => {
-          const questions = shuffled(
-            CATEGORIES.flatMap((category) => categoryRandomSet(category.id, 4)),
-          );
+          const questions = balancedAllQuestions();
           startPractice({
             title: "전체 영역 랜덤 예시문제",
             questions,
@@ -103,7 +118,7 @@ function Page({
       />
     );
   }
-  const category = CATEGORIES.find((item) => item.id === route.categoryId) ?? null;
+  const category = TUTORIAL_CATEGORIES.find((item) => item.id === route.categoryId) ?? null;
   const subtype: Subtype | null =
     category?.subtypes.find((item) => item.id === route.subtypeId) ?? null;
   const kind: ProblemKind | null = subtype?.kinds.find((item) => item.id === route.kindId) ?? null;
@@ -134,7 +149,7 @@ function Page({
         onExamples={() => {
           startPractice({
             title: `${category.name} ${kind.name} 예시문제`,
-            questions: shuffled(questionsForKind(kind.id)),
+            questions: questionsForTutorial(kind.id),
             returnPath: `/${category.id}/${subtype.id}/${kind.id}`,
             resultPath: `/${category.id}/${subtype.id}/${kind.id}/result`,
           });
@@ -154,7 +169,7 @@ function Page({
     );
   return (
     <Home
-      categories={CATEGORIES}
+      categories={TUTORIAL_CATEGORIES}
       onSelect={(id) => navigate(`/${id}`)}
       onRandom={() => navigate("/random")}
     />

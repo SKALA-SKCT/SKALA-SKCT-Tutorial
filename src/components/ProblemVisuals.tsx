@@ -50,8 +50,12 @@ export default function ProblemVisuals({ visuals, activeIds, dimmed }: Props) {
               <table className="problem-table">
                 <thead>
                   <tr>
+                    {/* 본문 각 행은 항목 이름 칸으로 시작한다. 머리글에도 그 칸을 두어야 연도와 값이 어긋나지 않는다. */}
+                    <th scope="col">구분</th>
                     {visual.columns.map((column) => (
-                      <th key={column}>{column}</th>
+                      <th key={column} scope="col">
+                        {column}
+                      </th>
                     ))}
                   </tr>
                 </thead>

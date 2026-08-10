@@ -23,15 +23,12 @@ export default function CategoryPage({
       <div className="subtype-grid">
         {category.subtypes.flatMap((subtype) =>
           subtype.kinds.map((kind) => (
-            <button
-              className="subtype-card"
-              key={kind.id}
-              onClick={() => onSelect(subtype, kind)}
-            >
+            <button className="subtype-card" key={kind.id} onClick={() => onSelect(subtype, kind)}>
               <div>
                 <h3>{kind.name}</h3>
                 <p>{kind.description}</p>
               </div>
+              <span aria-hidden="true">학습하기 →</span>
             </button>
           )),
         )}

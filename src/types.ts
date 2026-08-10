@@ -71,6 +71,14 @@ export interface ProblemSequence {
 
 export type ProblemVisual = ProblemTable | ProblemBarChart | ProblemSequence;
 
+/** 메인 브랜치 튜토리얼에서 사용하는 단순 표 형식입니다. */
+export interface DataTable {
+  title?: string;
+  unit?: string;
+  columns: string[];
+  rows: string[][];
+}
+
 export interface Problem {
   id: string;
   type: ProblemType;
@@ -90,6 +98,8 @@ export interface Problem {
   passageLabel?: string;
   /** Structured source material shown as an actual table or graph. */
   visuals?: ProblemVisual[];
+  /** 메인 브랜치의 자료해석 튜토리얼에서 사용하는 표입니다. */
+  table?: DataTable;
   passage: Segment[];
   choices: Choice[];
   answerId: string;

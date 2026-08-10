@@ -3,11 +3,11 @@
 SKCT의 출제 분류와 풀이 전략을 기준으로 **언어이해, 자료해석, 창의수리, 언어추리,
 수열추리**를 단계별로 학습하는 튜토리얼 앱입니다. 흐름은 다음과 같습니다.
 
-`5개 영역, 세부 유형, 풀이 튜토리얼, 세부 유형 종류`
+`5개 영역, 21개 문제 유형, 풀이 튜토리얼, 유형별 예시문제`
 
-현재 21개 세부 유형 아래 65개 세부 유형 종류가 있으며, 모든 종류에 독립적인 문제와
-5단계 해설, 실전 풀이 팁이 연결되어 있습니다. 튜토리얼 상단의 번호로 같은 세부 유형에
-속한 종류를 전환할 수 있습니다.
+현재 21개 문제 유형마다 풀이 튜토리얼과 독립적인 예시문제 20문항이 연결되어 있습니다.
+영역 랜덤은 해당 영역의 문제 유형을 균등하게 섞고, 완전 랜덤은 5개 영역에서 각각
+4문항씩 출제합니다.
 
 ## 기술 스택
 
@@ -34,8 +34,9 @@ npm run deploy   # build 후 wrangler deploy (최초 1회 `npx wrangler login` �
 
 ```
 src/
-  data/catalog.ts      # 5개 영역, 세부 유형, 세부 유형 종류와 실전 팁
-  data/bookTutorials.ts # 65개 튜토리얼 문제와 단계별 해설
+  data/catalog.ts      # 5개 영역의 화면 정보
+  data/tutorials/      # 21개 튜토리얼 문제와 단계별 해설
+  data/exampleQuestions.ts # 21개 유형별 예시문제 420문항
   data/problems.ts     # 튜토리얼 문제 진입점
   types.ts             # Problem / Segment / Step / Choice 타입
   components/
@@ -51,8 +52,8 @@ wrangler.jsonc         # Workers 설정 (assets 바인딩, SPA fallback)
 
 ## 문제 추가하는 법
 
-`src/data/catalog.ts`에 세부 유형 종류를 등록하고 `src/data/bookTutorials.ts`에 같은 id의
-문제를 추가하면 됩니다.
+`src/data/tutorials/`에 문제 유형을 등록하면 해당 튜토리얼 ID를 기준으로 예시문제 세트가
+구성됩니다.
 
 1. `passage`를 **문장 단위 `Segment`** 로 쪼갭니다. 문단 시작 문장에는 `newParagraph: true`,
    삽입형의 `(A)~(E)` 자리는 `kind: "position"` 을 줍니다.

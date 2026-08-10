@@ -2,22 +2,28 @@ import { useState } from "react";
 import type { Problem } from "../types";
 import Passage from "./Passage";
 import ProblemVisuals from "./ProblemVisuals";
+import DataTableView from "./DataTable";
 import Choices from "./Choices";
 import ExamHeader from "./ExamHeader";
 import ExamTools from "./exam/ExamTools";
 
 interface Props {
   problems: Problem[];
+  subtypeName?: string;
   title: string;
   onBack: () => void;
 }
 
-export default function TutorialPlayer({ problems, title, onBack }: Props) {
-  const problemIndex = 0;
+export default function TutorialPlayer({ problems, subtypeName, title, onBack }: Props) {
+  const [problemIndex, setProblemIndex] = useState(0);
   const [stepIndex, setStepIndex] = useState(0);
   const [zoom, setZoom] = useState(100);
   const problem = problems[problemIndex];
   const step = problem.steps[stepIndex];
+  const selectProblem = (index: number) => {
+    setProblemIndex(index);
+    setStepIndex(0);
+  };
 
   // Once any step up to here has `reveal`, keep the answer shown.
   const revealed = problem.steps.slice(0, stepIndex + 1).some((s) => s.reveal);
@@ -65,14 +71,39 @@ export default function TutorialPlayer({ problems, title, onBack }: Props) {
         </aside>
 
         <div className="exam-question-column">
+          {problems.length > 1 && (
+            <nav className="tutorial-question-nav" aria-label="튜토리얼 유형 이동">
+              {problems.map((item, index) => (
+                <button
+                  type="button"
+                  className={index === problemIndex ? "active" : ""}
+                  key={item.id}
+                  aria-label={`${index + 1}번 유형`}
+                  aria-current={index === problemIndex ? "page" : undefined}
+                  onClick={() => selectProblem(index)}
+                >
+                  {index + 1}
+                </button>
+              ))}
+            </nav>
+          )}
           <div className="exam-question-card">
             <div className="exam-question-label">
-              <span>{problem.typeLabel}</span>
+              <span>
+                {subtypeName && problems.length > 1
+                  ? `${subtypeName} ${problemIndex + 1}/${problems.length}`
+                  : problem.typeLabel}
+                {subtypeName && problems.length > 1 && (
+                  <small className="tutorial-internal-label">{problem.internalTypeName}</small>
+                )}
+              </span>
             </div>
             <div className="tutorial-problem-content">
               <div className="exam-prompt">
                 <h2>{problem.stem}</h2>
               </div>
+
+              {problem.table && <DataTableView table={problem.table} />}
 
               {problem.box && (
                 <div className={`box${step.highlightBox ? " active" : ""}`}>
@@ -111,6 +142,10 @@ export default function TutorialPlayer({ problems, title, onBack }: Props) {
         <ExamTools
           resetKey={`${problem.id}:${stepIndex}`}
           onExit={onBack}
+          onPrevious={problems.length > 1 ? () => selectProblem(problemIndex - 1) : undefined}
+          onNext={problems.length > 1 ? () => selectProblem(problemIndex + 1) : undefined}
+          previousDisabled={problemIndex === 0}
+          nextDisabled={problemIndex === problems.length - 1}
         />
       </div>
     </div>
