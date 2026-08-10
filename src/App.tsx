@@ -10,6 +10,7 @@ import StudyHub from "./components/StudyHub";
 import ExampleQuiz, { type PracticeResult } from "./components/ExampleQuiz";
 import ExampleResult from "./components/ExampleResult";
 import RandomHub from "./components/RandomHub";
+import { shuffled } from "./utils/array";
 
 type RouteMode = "tutorial" | "examples" | "result" | null;
 interface RouteState {
@@ -25,15 +26,6 @@ interface PracticeSession {
   returnPath: string;
   resultPath: string;
 }
-
-const shuffled = <T,>(items: T[]) => {
-  const result = [...items];
-  for (let i = result.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [result[i], result[j]] = [result[j], result[i]];
-  }
-  return result;
-};
 
 const categoryRandomSet = (categoryId: string, count = 20) => {
   const groups = Object.values(
