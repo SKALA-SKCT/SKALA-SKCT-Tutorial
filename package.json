@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.worker.json && vite build",
+    "test:calculator": "node --test tests/calculator.test.mjs",
     "validate:examples": "node scripts/validate-example-bank.mjs",
     "preview": "npm run build && vite preview",
     "deploy": "npm run build && wrangler deploy",
