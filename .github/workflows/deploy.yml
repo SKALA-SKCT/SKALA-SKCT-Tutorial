@@ -1,0 +1,40 @@
+name: Deploy to Cloudflare Workers
+
+# Auto-deploy on every push to main (this is what makes it behave like Pages).
+# You can also run it manually from the repo's "Actions" tab (workflow_dispatch).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Serialize production deploys so two quick pushes don't race each other.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # `npm run deploy` = tsc typechecks + `vite build` + `wrangler deploy`
+      # (the exact command used locally). A failing typecheck blocks the deploy.
+      - name: Build & deploy
+        run: npm run deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
