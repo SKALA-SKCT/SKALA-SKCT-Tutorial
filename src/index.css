@@ -1653,6 +1653,9 @@ button {
 .calc-grid .span-three {
   grid-column: span 3;
 }
+.calc-grid .span-four {
+  grid-column: span 4;
+}
 .calc-grid .equals {
   grid-row: span 2;
   border-color: var(--brand);

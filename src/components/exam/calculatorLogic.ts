@@ -1,8 +1,7 @@
 export function calculate(source: string) {
   const safe = source
     .replaceAll("×", "*")
-    .replaceAll("÷", "/")
-    .replace(/(\d+(?:\.\d+)?)%/g, "($1/100)");
+    .replaceAll("÷", "/");
   if (!/^[\d+\-*/().\s]+$/.test(safe)) throw new Error("invalid");
   const result = Function(`"use strict"; return (${safe})`)();
   if (typeof result !== "number" || !Number.isFinite(result)) throw new Error("invalid");
@@ -30,7 +29,6 @@ export function nextExpression({ expression, calculated }: CalculatorInputState,
 export interface FinishedCalculation {
   expression: string;
   history: string[];
-  pendingRecord: string | null;
   calculated: boolean;
 }
 
@@ -38,17 +36,7 @@ export function finishCalculation(expression: string, history: string[]): Finish
   const result = String(calculate(expression));
   return {
     expression: result,
-    history,
-    pendingRecord: `${expression} = ${result}`,
+    history: [...history, `${expression} = ${result}`].slice(-2),
     calculated: true,
-  };
-}
-
-export function startNextCalculation(state: FinishedCalculation, value: string): FinishedCalculation {
-  return {
-    expression: nextExpression(state, value),
-    history: state.pendingRecord ? [...state.history, state.pendingRecord].slice(-2) : state.history,
-    pendingRecord: null,
-    calculated: false,
   };
 }

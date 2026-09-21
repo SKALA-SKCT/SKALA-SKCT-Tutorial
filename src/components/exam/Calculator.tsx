@@ -1,26 +1,24 @@
 import { useEffect, useReducer } from "react";
-import { finishCalculation, nextExpression, startNextCalculation } from "./calculatorLogic";
+import { finishCalculation, nextExpression } from "./calculatorLogic";
 
-const KEY_INPUTS = [".", "+", "-", "×", "÷", "(", ")", "%"];
+const KEY_INPUTS = [".", "+", "-", "×", "÷", "(", ")"];
 
 interface State {
   expression: string;
   history: string[];
   calculated: boolean;
-  pendingRecord: string | null;
 }
 
 type Action = { type: "input"; value: string } | { type: "clear" } | { type: "equals" };
 
-const initialState: State = { expression: "0", history: [], calculated: false, pendingRecord: null };
+const initialState: State = { expression: "0", history: [], calculated: false };
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case "input":
-      if (state.calculated) return startNextCalculation(state, action.value);
       return { ...state, expression: nextExpression(state, action.value), calculated: false };
     case "clear":
-      return { ...state, expression: "0", calculated: false, pendingRecord: null };
+      return { ...state, expression: "0", calculated: false };
     case "equals":
       try {
         if (state.calculated) return state;
@@ -85,10 +83,9 @@ export default function Calculator() {
         {button("−", "-", "operator")}
         {button("+", "+", "operator")}
         {["1", "2", "3"].map((n) => button(n))}
-        {button("%", "%", "operator")}
-        {button("=", "=", "equals")}
-        {button("0", "0", "span-three")}
         {button(".")}
+        {button("=", "=", "equals")}
+        {button("0", "0", "span-four")}
       </div>
     </div>
   );
