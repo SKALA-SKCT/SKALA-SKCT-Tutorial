@@ -4,6 +4,7 @@ import { getCurrentUserName, logout as requestLogout } from "../api/auth";
 const motherUrl = "https://www.skala-skct.com";
 const mockUrl = "https://mock.skala-skct.com";
 const practiceUrl = "https://practice.skala-skct.com";
+const communityUrl = import.meta.env.VITE_COMMUNITY_URL ?? "https://community.skala-skct.com";
 
 export default function SiteHeader() {
   const [accountOpen, setAccountOpen] = useState(false);
@@ -38,6 +39,7 @@ export default function SiteHeader() {
           <a className="active" href="/" aria-current="page">
             유형별 문제 연습
           </a>
+          <a href={communityUrl}>게시판</a>
         </div>
 
         <div className="site-account">
