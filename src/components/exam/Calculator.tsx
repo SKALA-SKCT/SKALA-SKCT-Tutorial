@@ -1,33 +1,30 @@
 import { useEffect, useReducer } from "react";
-import { calculate, nextExpression } from "./calculatorLogic";
+import { finishCalculation, nextExpression, startNextCalculation } from "./calculatorLogic";
 
-const HISTORY_LIMIT = 2;
 const KEY_INPUTS = [".", "+", "-", "×", "÷", "(", ")", "%"];
 
 interface State {
   expression: string;
   history: string[];
   calculated: boolean;
+  pendingRecord: string | null;
 }
 
 type Action = { type: "input"; value: string } | { type: "clear" } | { type: "equals" };
 
-const initialState: State = { expression: "0", history: [], calculated: false };
+const initialState: State = { expression: "0", history: [], calculated: false, pendingRecord: null };
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case "input":
+      if (state.calculated) return startNextCalculation(state, action.value);
       return { ...state, expression: nextExpression(state, action.value), calculated: false };
     case "clear":
-      return { ...state, expression: "0", calculated: false };
+      return { ...state, expression: "0", calculated: false, pendingRecord: null };
     case "equals":
       try {
-        const result = String(calculate(state.expression));
-        return {
-          expression: result,
-          history: [`${state.expression} = ${result}`, ...state.history].slice(0, HISTORY_LIMIT),
-          calculated: true,
-        };
+        if (state.calculated) return state;
+        return finishCalculation(state.expression, state.history);
       } catch {
         return { ...state, expression: "오류", calculated: true };
       }

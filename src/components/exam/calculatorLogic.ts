@@ -26,3 +26,29 @@ export function nextExpression({ expression, calculated }: CalculatorInputState,
   }
   return expression + value;
 }
+
+export interface FinishedCalculation {
+  expression: string;
+  history: string[];
+  pendingRecord: string | null;
+  calculated: boolean;
+}
+
+export function finishCalculation(expression: string, history: string[]): FinishedCalculation {
+  const result = String(calculate(expression));
+  return {
+    expression: result,
+    history,
+    pendingRecord: `${expression} = ${result}`,
+    calculated: true,
+  };
+}
+
+export function startNextCalculation(state: FinishedCalculation, value: string): FinishedCalculation {
+  return {
+    expression: nextExpression(state, value),
+    history: state.pendingRecord ? [...state.history, state.pendingRecord].slice(-2) : state.history,
+    pendingRecord: null,
+    calculated: false,
+  };
+}
