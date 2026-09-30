@@ -10,6 +10,12 @@
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
   },
+  // 문제 세트 점수 기록. id를 비워 두면 wrangler deploy가 네임스페이스를 자동으로 만듭니다.
+  "kv_namespaces": [
+    {
+      "binding": "SET_RECORDS",
+    },
+  ],
   "observability": {
     "enabled": true,
   },

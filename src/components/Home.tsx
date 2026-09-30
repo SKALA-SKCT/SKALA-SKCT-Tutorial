@@ -5,10 +5,12 @@ export default function Home({
   categories,
   onSelect,
   onRandom,
+  onSets,
 }: {
   categories: Category[];
   onSelect: (id: string) => void;
   onRandom: () => void;
+  onSets: () => void;
 }) {
   const [activeCard, setActiveCard] = useState<number | null>(null);
   const descriptionLines: Record<string, string[]> = {
@@ -41,22 +43,34 @@ export default function Home({
   const cards = [
     ...categories.map((category) => ({ type: "category" as const, category })),
     { type: "random" as const },
+    { type: "sets" as const },
   ];
+  const cardLabel = (card: (typeof cards)[number]) =>
+    card.type === "category"
+      ? card.category.name
+      : card.type === "random"
+        ? "랜덤 문제 풀기"
+        : "문제 세트";
+  const openCard = (card: (typeof cards)[number]) => {
+    if (card.type === "category") onSelect(card.category.id);
+    else if (card.type === "random") onRandom();
+    else onSets();
+  };
   return (
     <div className="home">
       <header className="home-head">
         <h1>유형별 문제 연습</h1>
-        <p>SKCT의 5개 인지 영역을 유형별로 나누어 핵심 풀이 전략을 익히고 예시문제로 연습할 수 있습니다.</p>
+        <p>
+          SKCT의 5개 인지 영역을 유형별로 나누어 핵심 풀이 전략을 익히고 예시문제로 연습할 수
+          있습니다.
+        </p>
       </header>
       <div
         className={`category-grid${activeCard === null ? "" : ` active-card-${activeCard + 1}`}`}
       >
         {cards.map((card) =>
           card.type === "category" ? (
-            <div
-              className={`category-card category-${card.category.id}`}
-              key={card.category.id}
-            >
+            <div className={`category-card category-${card.category.id}`} key={card.category.id}>
               <span className="category-number">{card.category.number}</span>
               <div>
                 <h2>{card.category.name}</h2>
@@ -68,11 +82,21 @@ export default function Home({
               </div>
               <span className="category-arrow">→</span>
             </div>
+          ) : card.type === "sets" ? (
+            <div className="category-card category-sets" key="sets">
+              <span className="category-number">07</span>
+              <div>
+                <h2>문제 세트</h2>
+                <p>
+                  <span>영역별로 세부 유형을 섞은</span>
+                  <span>20문제 세트를 풀고</span>
+                  <span>점수 기록을 확인할 수 있습니다.</span>
+                </p>
+              </div>
+              <span className="category-arrow">→</span>
+            </div>
           ) : (
-            <div
-              className="category-card category-random"
-              key="random"
-            >
+            <div className="category-card category-random" key="random">
               <span className="category-number">06</span>
               <div>
                 <h2>랜덤 문제 풀기</h2>
@@ -88,11 +112,9 @@ export default function Home({
         <div className="category-hit-grid" onPointerLeave={() => setActiveCard(null)}>
           {cards.map((card, index) => (
             <button
-              aria-label={card.type === "category" ? card.category.name : "랜덤 문제 풀기"}
-              key={card.type === "category" ? card.category.id : "random"}
-              onClick={() =>
-                card.type === "category" ? onSelect(card.category.id) : onRandom()
-              }
+              aria-label={cardLabel(card)}
+              key={card.type === "category" ? card.category.id : card.type}
+              onClick={() => openCard(card)}
               onPointerEnter={() => setActiveCard(index)}
               onFocus={() => setActiveCard(index)}
             />

@@ -9,6 +9,9 @@ SKCT의 출제 분류와 풀이 전략을 기준으로 **언어이해, 자료해
 영역 랜덤은 해당 영역의 문제 유형을 균등하게 섞고, 완전 랜덤은 5개 영역에서 각각
 4문항씩 출제합니다.
 
+문제 세트는 영역마다 세부 유형을 번갈아 섞은 고정 20문항 세트입니다. 모든 사용자가 같은
+문제를 풀고, 응시 기록은 Worker의 `SET_RECORDS` KV에 사용자별로 저장됩니다.
+
 ## 기술 스택
 
 - **Vite + React (TypeScript)** 프론트엔드
@@ -38,6 +41,7 @@ src/
   data/tutorials/      # 21개 튜토리얼 문제와 단계별 해설
   data/exampleQuestions.ts # 21개 유형별 예시문제 420문항
   data/problems.ts     # 튜토리얼 문제 진입점
+  data/problemSets.ts  # 영역별 고정 20문항 문제 세트
   types.ts             # Problem / Segment / Step / Choice 타입
   components/
     Home.tsx           # 유형 목록 카드

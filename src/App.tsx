@@ -14,6 +14,10 @@ import StudyHub from "./components/StudyHub";
 import ExampleQuiz, { type PracticeResult } from "./components/ExampleQuiz";
 import ExampleResult from "./components/ExampleResult";
 import RandomHub from "./components/RandomHub";
+import SetHub from "./components/SetHub";
+import SetList from "./components/SetList";
+import { PROBLEM_SETS, type ProblemSet } from "./data/problemSets";
+import { saveSetRecord } from "./api/setRecords";
 
 type RouteMode = "tutorial" | "examples" | "result" | null;
 interface RouteState {
@@ -28,7 +32,19 @@ interface PracticeSession {
   questions: ExampleQuestion[];
   returnPath: string;
   resultPath: string;
+  /** 문제 세트 응시일 때만 있으며, 채점 후 점수 기록을 저장합니다. */
+  setId?: string;
 }
+type RecordStatus = "idle" | "saving" | "saved" | "failed";
+
+const SET_EXIT_NOTE = "채점 결과는 문제 세트 기록에 저장됩니다.";
+const SET_LEAVE_MESSAGE = "이 결과는 문제 세트 목록의 응시 기록에서 다시 확인할 수 있습니다.";
+const recordNotice: Record<RecordStatus, string | undefined> = {
+  idle: undefined,
+  saving: "기록을 저장하고 있습니다.",
+  saved: undefined,
+  failed: "기록을 저장하지 못했습니다. 로그인 상태를 확인해 주세요.",
+};
 
 const tutorialPrefixByCategory: Record<string, string> = {
   "verbal-comprehension": "vc-",
@@ -71,6 +87,8 @@ function Page({
   result,
   finishPractice,
   leaveResult,
+  openResult,
+  recordStatus,
 }: {
   route: RouteState;
   navigate: (path: string) => void;
@@ -79,7 +97,67 @@ function Page({
   result: PracticeResult | null;
   finishPractice: (value: PracticeResult) => void;
   leaveResult: () => void;
+  openResult: (config: PracticeSession, value: PracticeResult) => void;
+  recordStatus: RecordStatus;
 }) {
+  if (route.categoryId === "sets") {
+    // /sets/:영역/:세트번호/(examples|result) 경로에서 subtypeId는 영역, kindId는 세트 번호입니다.
+    const setCategory = TUTORIAL_CATEGORIES.find((item) => item.id === route.subtypeId) ?? null;
+    const set = PROBLEM_SETS.find(
+      (item) => item.categoryId === route.subtypeId && String(item.number) === route.kindId,
+    );
+    const sessionFor = (target: ProblemSet): PracticeSession => ({
+      title: `${setCategory?.name ?? ""} 문제 세트 ${target.number}`,
+      questions: target.questions,
+      returnPath: `/sets/${target.categoryId}`,
+      resultPath: `/sets/${target.categoryId}/${target.number}/result`,
+      setId: target.id,
+    });
+    if (set && route.mode === "examples" && session)
+      return (
+        <ExampleQuiz
+          title={session.title}
+          questions={session.questions}
+          onFinish={finishPractice}
+          exitNote={SET_EXIT_NOTE}
+        />
+      );
+    if (set && route.mode === "result" && result)
+      return (
+        <ExampleResult
+          result={result}
+          onLeave={leaveResult}
+          notice={recordNotice[recordStatus]}
+          leaveMessage={recordStatus === "saved" ? SET_LEAVE_MESSAGE : undefined}
+        />
+      );
+    if (setCategory)
+      return (
+        <SetList
+          category={setCategory}
+          onBack={() => navigate("/sets")}
+          onStart={(target) => {
+            startPractice(sessionFor(target));
+            navigate(`/sets/${target.categoryId}/${target.number}/examples`);
+          }}
+          onViewRecord={(target, record) => {
+            const config = sessionFor(target);
+            openResult(config, {
+              title: config.title,
+              questions: target.questions,
+              answers: record.answers,
+            });
+          }}
+        />
+      );
+    return (
+      <SetHub
+        categories={TUTORIAL_CATEGORIES}
+        onBack={() => navigate("/")}
+        onSelect={(category) => navigate(`/sets/${category.id}`)}
+      />
+    );
+  }
   if (route.categoryId === "random") {
     if (route.mode === "examples" && session)
       return (
@@ -172,6 +250,7 @@ function Page({
       categories={TUTORIAL_CATEGORIES}
       onSelect={(id) => navigate(`/${id}`)}
       onRandom={() => navigate("/random")}
+      onSets={() => navigate("/sets")}
     />
   );
 }
@@ -187,6 +266,14 @@ export default function App() {
         randomScope: parts[1] ?? null,
         mode: parts[2] === "examples" || parts[2] === "result" ? parts[2] : null,
       };
+    if (parts[0] === "sets")
+      return {
+        categoryId: "sets",
+        subtypeId: parts[1] ?? null,
+        kindId: parts[2] ?? null,
+        randomScope: null,
+        mode: parts[3] === "examples" || parts[3] === "result" ? parts[3] : null,
+      };
     const [categoryId = null, subtypeId = null, kindId = null, modeValue = null] = parts;
     const mode: RouteMode =
       modeValue === "tutorial" || modeValue === "examples" || modeValue === "result"
@@ -197,6 +284,7 @@ export default function App() {
   const [route, setRoute] = useState(readRoute);
   const [session, setSession] = useState<PracticeSession | null>(null);
   const [result, setResult] = useState<PracticeResult | null>(null);
+  const [recordStatus, setRecordStatus] = useState<RecordStatus>("idle");
   useEffect(() => {
     const sync = () => setRoute(readRoute());
     window.addEventListener("popstate", sync);
@@ -209,7 +297,20 @@ export default function App() {
   };
   const finishPractice = (value: PracticeResult) => {
     setResult(value);
-    if (session) navigate(session.resultPath);
+    if (!session) return;
+    if (session.setId) {
+      setRecordStatus("saving");
+      saveSetRecord(session.setId, value.answers)
+        .then(() => setRecordStatus("saved"))
+        .catch(() => setRecordStatus("failed"));
+    }
+    navigate(session.resultPath);
+  };
+  const openResult = (config: PracticeSession, value: PracticeResult) => {
+    setSession(config);
+    setResult(value);
+    setRecordStatus("saved");
+    navigate(config.resultPath);
   };
   const leaveResult = () => {
     const path = session?.returnPath ?? "/";
@@ -228,11 +329,14 @@ export default function App() {
           startPractice={(config) => {
             setSession(config);
             setResult(null);
+            setRecordStatus("idle");
           }}
           session={session}
           result={result}
           finishPractice={finishPractice}
           leaveResult={leaveResult}
+          openResult={openResult}
+          recordStatus={recordStatus}
         />
       </main>
     </div>

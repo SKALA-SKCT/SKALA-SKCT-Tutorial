@@ -17,10 +17,12 @@ export default function ExampleQuiz({
   title,
   questions,
   onFinish,
+  exitNote = "결과를 나가면 기록은 저장되지 않습니다.",
 }: {
   title: string;
   questions: ExampleQuestion[];
   onFinish: (result: PracticeResult) => void;
+  exitNote?: string;
 }) {
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number>>({});
@@ -135,8 +137,7 @@ export default function ExampleQuiz({
           >
             <h2 id="practice-exit-title">여기까지 채점할까요?</h2>
             <p>
-              응답한 {answeredCount}문항만 결과에 표시됩니다. 결과를 나가면 기록은 저장되지
-              않습니다.
+              응답한 {answeredCount}문항만 결과에 표시됩니다. {exitNote}
             </p>
             <div>
               <button type="button" onClick={() => setShowExitConfirm(false)}>
