@@ -2,6 +2,72 @@ import { choiceMarker, type ExampleQuestion } from "../data/catalog";
 import ProblemVisuals from "./ProblemVisuals";
 import { displayQuestionStem } from "../utils/questionText";
 
+export function ReviewBody({
+  question,
+  selected,
+  showStem = false,
+}: {
+  question: ExampleQuestion;
+  selected: number | undefined;
+  showStem?: boolean;
+}) {
+  const answered = selected !== undefined;
+  const materials = (
+    <>
+      {question.box && (
+        <div className="box practice-box">
+          <span className="box-label">&lt;보기&gt;</span>
+          <p>{question.box}</p>
+        </div>
+      )}
+      {question.visuals && (
+        <ProblemVisuals visuals={question.visuals} activeIds={[]} dimmed={false} />
+      )}
+      {question.passage && (
+        <div className="practice-passage">
+          {question.passageLabel && <strong>&lt;{question.passageLabel}&gt;</strong>}
+          <p>{question.passage}</p>
+        </div>
+      )}
+    </>
+  );
+  return (
+    <>
+      {showStem ? (
+        <div className="set-question-material">
+          <h3>{displayQuestionStem(question.stem)}</h3>
+          {materials}
+        </div>
+      ) : (
+        materials
+      )}
+      <div className="example-review-choices">
+        {question.choices.map((choice, index) => (
+          <div
+            className={`${index === question.answer ? "correct-answer" : ""}${index === selected && index !== question.answer ? " selected-wrong" : ""}`}
+            key={`${index}-${choice}`}
+          >
+            <span>{choiceMarker(index)}</span>
+            <p>{choice}</p>
+            {index === question.answer && <small>정답</small>}
+            {index === selected && index !== question.answer && <small>내 답</small>}
+          </div>
+        ))}
+      </div>
+      <div className="example-review-answer">
+        <p>
+          내 답: {answered ? choiceMarker(selected) : "미응답"}
+          <strong>정답: {choiceMarker(question.answer)}</strong>
+        </p>
+      </div>
+      <div className="example-review-explanation">
+        <strong>해설</strong>
+        <p>{question.explanation}</p>
+      </div>
+    </>
+  );
+}
+
 interface ExampleReviewCardProps {
   question: ExampleQuestion;
   number: number;
@@ -60,44 +126,7 @@ export default function ExampleReviewCard({
       </button>
       {open && (
         <div className="example-review-body">
-          {question.box && (
-            <div className="box practice-box">
-              <span className="box-label">&lt;보기&gt;</span>
-              <p>{question.box}</p>
-            </div>
-          )}
-          {question.visuals && (
-            <ProblemVisuals visuals={question.visuals} activeIds={[]} dimmed={false} />
-          )}
-          {question.passage && (
-            <div className="practice-passage">
-              {question.passageLabel && <strong>&lt;{question.passageLabel}&gt;</strong>}
-              <p>{question.passage}</p>
-            </div>
-          )}
-          <div className="example-review-choices">
-            {question.choices.map((choice, index) => (
-              <div
-                className={`${index === question.answer ? "correct-answer" : ""}${index === selected && index !== question.answer ? " selected-wrong" : ""}`}
-                key={`${index}-${choice}`}
-              >
-                <span>{choiceMarker(index)}</span>
-                <p>{choice}</p>
-                {index === question.answer && <small>정답</small>}
-                {index === selected && index !== question.answer && <small>내 답</small>}
-              </div>
-            ))}
-          </div>
-          <div className="example-review-answer">
-            <p>
-              내 답: {answered ? choiceMarker(selected) : "미응답"}
-              <strong>정답: {choiceMarker(question.answer)}</strong>
-            </p>
-          </div>
-          <div className="example-review-explanation">
-            <strong>해설</strong>
-            <p>{question.explanation}</p>
-          </div>
+          <ReviewBody question={question} selected={selected} />
         </div>
       )}
     </article>

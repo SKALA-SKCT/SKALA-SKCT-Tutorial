@@ -44,3 +44,7 @@ export const PROBLEM_SETS: ProblemSet[] = Object.entries(categoryPrefix).flatMap
 export function setsForCategory(categoryId: string): ProblemSet[] {
   return PROBLEM_SETS.filter((set) => set.categoryId === categoryId);
 }
+
+export function scoreOf(set: ProblemSet, record: { answers: Record<string, number> }): number {
+  return set.questions.filter((question) => record.answers[question.id] === question.answer).length;
+}

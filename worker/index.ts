@@ -28,14 +28,18 @@ function methodNotAllowed(allowedMethod: "GET" | "POST" | "GET, POST"): Response
   );
 }
 
-async function proxyAuthRequest(request: Request, pathname: string): Promise<Response> {
+async function proxyAuthRequest(
+  request: Request,
+  pathname: string,
+  method = request.method,
+): Promise<Response> {
   const headers = new Headers();
   const cookie = request.headers.get("Cookie");
   if (cookie) headers.set("Cookie", cookie);
 
   try {
     return await fetch(new URL(pathname, AUTH_ORIGIN), {
-      method: request.method,
+      method,
       headers,
       redirect: "manual",
     });
@@ -45,7 +49,7 @@ async function proxyAuthRequest(request: Request, pathname: string): Promise<Res
 }
 
 async function currentUserId(request: Request): Promise<string | null> {
-  const response = await proxyAuthRequest(request, "/api/auth/me");
+  const response = await proxyAuthRequest(request, "/api/auth/me", "GET");
   if (!response.ok) return null;
   const user: unknown = await response.json().catch(() => null);
   if (typeof user !== "object" || user === null || !("sub" in user)) return null;

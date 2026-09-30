@@ -16,6 +16,7 @@ import ExampleResult from "./components/ExampleResult";
 import RandomHub from "./components/RandomHub";
 import SetHub from "./components/SetHub";
 import SetList from "./components/SetList";
+import SetResult, { type RecordStatus } from "./components/SetResult";
 import { PROBLEM_SETS, type ProblemSet } from "./data/problemSets";
 import { saveSetRecord } from "./api/setRecords";
 
@@ -35,16 +36,8 @@ interface PracticeSession {
   /** 문제 세트 응시일 때만 있으며, 채점 후 점수 기록을 저장합니다. */
   setId?: string;
 }
-type RecordStatus = "idle" | "saving" | "saved" | "failed";
 
 const SET_EXIT_NOTE = "채점 결과는 문제 세트 기록에 저장됩니다.";
-const SET_LEAVE_MESSAGE = "이 결과는 문제 세트 목록의 응시 기록에서 다시 확인할 수 있습니다.";
-const recordNotice: Record<RecordStatus, string | undefined> = {
-  idle: undefined,
-  saving: "기록을 저장하고 있습니다.",
-  saved: undefined,
-  failed: "기록을 저장하지 못했습니다. 로그인 상태를 확인해 주세요.",
-};
 
 const tutorialPrefixByCategory: Record<string, string> = {
   "verbal-comprehension": "vc-",
@@ -87,7 +80,6 @@ function Page({
   result,
   finishPractice,
   leaveResult,
-  openResult,
   recordStatus,
 }: {
   route: RouteState;
@@ -97,7 +89,6 @@ function Page({
   result: PracticeResult | null;
   finishPractice: (value: PracticeResult) => void;
   leaveResult: () => void;
-  openResult: (config: PracticeSession, value: PracticeResult) => void;
   recordStatus: RecordStatus;
 }) {
   if (route.categoryId === "sets") {
@@ -122,13 +113,19 @@ function Page({
           exitNote={SET_EXIT_NOTE}
         />
       );
-    if (set && route.mode === "result" && result)
+    const startSet = (target: ProblemSet) => {
+      startPractice(sessionFor(target));
+      navigate(`/sets/${target.categoryId}/${target.number}/examples`);
+    };
+    if (setCategory && set && route.mode === "result")
       return (
-        <ExampleResult
-          result={result}
-          onLeave={leaveResult}
-          notice={recordNotice[recordStatus]}
-          leaveMessage={recordStatus === "saved" ? SET_LEAVE_MESSAGE : undefined}
+        <SetResult
+          category={setCategory}
+          set={set}
+          recordStatus={recordStatus}
+          pendingAnswers={session?.setId === set.id ? (result?.answers ?? null) : null}
+          onBack={() => navigate(`/sets/${set.categoryId}`)}
+          onRetry={() => startSet(set)}
         />
       );
     if (setCategory)
@@ -136,18 +133,8 @@ function Page({
         <SetList
           category={setCategory}
           onBack={() => navigate("/sets")}
-          onStart={(target) => {
-            startPractice(sessionFor(target));
-            navigate(`/sets/${target.categoryId}/${target.number}/examples`);
-          }}
-          onViewRecord={(target, record) => {
-            const config = sessionFor(target);
-            openResult(config, {
-              title: config.title,
-              questions: target.questions,
-              answers: record.answers,
-            });
-          }}
+          onStart={startSet}
+          onResult={(target) => navigate(`/sets/${target.categoryId}/${target.number}/result`)}
         />
       );
     return (
@@ -306,12 +293,7 @@ export default function App() {
     }
     navigate(session.resultPath);
   };
-  const openResult = (config: PracticeSession, value: PracticeResult) => {
-    setSession(config);
-    setResult(value);
-    setRecordStatus("saved");
-    navigate(config.resultPath);
-  };
+
   const leaveResult = () => {
     const path = session?.returnPath ?? "/";
     setSession(null);
@@ -335,7 +317,6 @@ export default function App() {
           result={result}
           finishPractice={finishPractice}
           leaveResult={leaveResult}
-          openResult={openResult}
           recordStatus={recordStatus}
         />
       </main>

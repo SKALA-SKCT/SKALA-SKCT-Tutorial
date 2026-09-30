@@ -7,13 +7,9 @@ import ResultExitConfirm from "./ResultExitConfirm";
 export default function ExampleResult({
   result,
   onLeave,
-  notice,
-  leaveMessage,
 }: {
   result: PracticeResult;
   onLeave: () => void;
-  notice?: string;
-  leaveMessage?: string;
 }) {
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [openQuestionIds, setOpenQuestionIds] = useState<Set<string>>(() => new Set());
@@ -55,7 +51,6 @@ export default function ExampleResult({
             <span>/20</span>
           </strong>
         </header>
-        {notice && <p className="set-notice">{notice}</p>}
         {reviewGroups.map(([label, questions]) => (
           <section className="example-review-group" key={label}>
             {!randomResult && !singleType && (
@@ -93,11 +88,7 @@ export default function ExampleResult({
         ))}
       </main>
       {showExitConfirm && (
-        <ResultExitConfirm
-          onCancel={() => setShowExitConfirm(false)}
-          onConfirm={onLeave}
-          message={leaveMessage}
-        />
+        <ResultExitConfirm onCancel={() => setShowExitConfirm(false)} onConfirm={onLeave} />
       )}
     </section>
   );

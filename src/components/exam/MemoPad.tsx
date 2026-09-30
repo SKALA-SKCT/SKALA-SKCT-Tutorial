@@ -1,17 +1,19 @@
 import { useRef, useState } from "react";
 
-function MemoTextarea() {
+function MemoTextarea({ placeholder }: { placeholder: string }) {
   const [memo, setMemo] = useState("");
   return (
-    <textarea
-      value={memo}
-      onChange={(e) => setMemo(e.target.value)}
-      placeholder="다음 문제로 넘어가면 지워집니다"
-    />
+    <textarea value={memo} onChange={(e) => setMemo(e.target.value)} placeholder={placeholder} />
   );
 }
 
-export default function MemoPad({ resetKey }: { resetKey: number | string }) {
+export default function MemoPad({
+  resetKey,
+  placeholder = "다음 문제로 넘어가면 지워집니다",
+}: {
+  resetKey: number | string;
+  placeholder?: string;
+}) {
   const [tab, setTab] = useState<"memo" | "draw">("memo");
   const [memoReset, setMemoReset] = useState(0);
   const [tool, setTool] = useState<"pen" | "eraser">("pen");
@@ -101,7 +103,7 @@ export default function MemoPad({ resetKey }: { resetKey: number | string }) {
       </div>
       <div className="memo-body">
         {tab === "memo" ? (
-          <MemoTextarea key={`${resetKey}:${memoReset}`} />
+          <MemoTextarea key={`${resetKey}:${memoReset}`} placeholder={placeholder} />
         ) : (
           <canvas
             key={resetKey}
