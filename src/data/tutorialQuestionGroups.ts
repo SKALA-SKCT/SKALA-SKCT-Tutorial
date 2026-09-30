@@ -1,5 +1,6 @@
 import type { ExampleQuestion } from "./catalog";
 import { EXAMPLE_QUESTION_BANK } from "./exampleQuestions";
+import { EXTRA_QUESTION_BANK } from "./extraQuestions";
 import { PROBLEMS } from "./problems";
 import { shuffled } from "../utils/array";
 
@@ -29,10 +30,13 @@ export function questionsForTutorial(tutorialId: string, count = 20): ExampleQue
   );
 }
 
+const RANDOM_QUESTION_POOL = [...EXAMPLE_QUESTION_BANK, ...EXTRA_QUESTION_BANK];
+
 export function balancedCategoryQuestions(categoryId: string, count = 20): ExampleQuestion[] {
   const prefix = categoryPrefix[categoryId];
   const groups = PROBLEMS.filter((problem) => prefix && problem.id.startsWith(prefix)).map(
-    (problem) => questionsForTutorial(problem.id, 20),
+    (problem) =>
+      shuffled(RANDOM_QUESTION_POOL.filter((question) => question.kindId === problem.id)),
   );
   return shuffled(balancedFromGroups(groups, count));
 }

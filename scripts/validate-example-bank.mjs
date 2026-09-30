@@ -1,5 +1,5 @@
 import { readFile, readdir } from "node:fs/promises";
-import { createServer } from "vite";
+import { registerHooks } from "node:module";
 
 /**
  * 템플릿 문자열에서 치환값 바로 뒤에 조사를 직접 적으면 값에 따라 조사가 어긋난다.
@@ -15,13 +15,26 @@ const FALLBACK_CHOICES = [
   "조건이 서로 모순된다",
 ];
 
-const server = await createServer({ server: { middlewareMode: true }, appType: "custom" });
+const loader = registerHooks({
+  resolve(specifier, context, nextResolve) {
+    return nextResolve(
+      specifier.startsWith(".") && !/\.[cm]?[jt]sx?$/.test(specifier)
+        ? `${specifier}.ts`
+        : specifier,
+      context,
+    );
+  },
+});
 
 try {
-  const { EXAMPLE_QUESTION_BANK: questions } = await server.ssrLoadModule(
-    "/src/data/exampleQuestions.ts",
-  );
-  const { PROBLEMS } = await server.ssrLoadModule("/src/data/problems.ts");
+  const { EXAMPLE_QUESTION_BANK: baseQuestions } = await import("../src/data/exampleQuestions.ts");
+  // 추가 문항은 문제 세트와 랜덤 문제에만 쓰이지만 같은 품질 기준으로 함께 검사한다.
+  const { EXTRA_QUESTION_BANK: extraQuestions } = await import("../src/data/extraQuestions.ts");
+  const questions = [...baseQuestions, ...extraQuestions];
+  const BASE_PER_KIND = 20;
+  const EXTRA_PER_KIND = 60;
+  const PER_KIND = BASE_PER_KIND + EXTRA_PER_KIND;
+  const { PROBLEMS } = await import("../src/data/problems.ts");
   const failures = [];
   const fail = (id, message) => failures.push(`${id}: ${message}`);
   const categoryByPrefix = {
@@ -57,6 +70,17 @@ try {
       .replace(/\[연습\s*\d+\]/g, "")
       .replace(/\s+/g, " ")
       .trim();
+  const bigrams = (value) => {
+    const set = new Set();
+    for (let i = 0; i < value.length - 1; i += 1) set.add(value.slice(i, i + 2));
+    return set;
+  };
+  // 편집 거리는 긴 지문끼리 비교하면 느리므로 글자쌍 겹침이 큰 경우에만 계산한다.
+  const bigramOverlap = (a, b) => {
+    let shared = 0;
+    for (const item of a) if (b.has(item)) shared += 1;
+    return shared / Math.max(1, Math.min(a.size, b.size));
+  };
   const similarity = (left, right) => {
     const a = normalizeVisible(left);
     const b = normalizeVisible(right);
@@ -146,8 +170,16 @@ try {
     return null;
   };
 
-  if (questions.length !== expectedKinds.length * 20)
-    fail("bank", `문항 수 ${questions.length}개 (예상 ${expectedKinds.length * 20}개)`);
+  if (baseQuestions.length !== expectedKinds.length * BASE_PER_KIND)
+    fail(
+      "bank",
+      `기본 문항 수 ${baseQuestions.length}개 (예상 ${expectedKinds.length * BASE_PER_KIND}개)`,
+    );
+  if (extraQuestions.length !== expectedKinds.length * EXTRA_PER_KIND)
+    fail(
+      "extra",
+      `추가 문항 수 ${extraQuestions.length}개 (예상 ${expectedKinds.length * EXTRA_PER_KIND}개)`,
+    );
 
   for (const question of questions) {
     if (ids.has(question.id)) fail(question.id, "중복 ID");
@@ -217,7 +249,7 @@ try {
       fail(question.id, "수열추리 시각 자료 없음");
     if (question.categoryId === "verbal-comprehension") {
       const passageLength = question.passage?.replace(/\s/g, "").length ?? 0;
-      // 에듀윌·해커스 기출 지문을 공백 없이 세어 보면 짧은 문항도 300자 안팎이다.
+      // 에듀윌, 해커스 기출 지문을 공백 없이 세어 보면 짧은 문항도 300자 안팎이다.
       // 아래 값은 현재 문제은행이 실제로 지키고 있는 하한이며, 지문을 줄이는 수정이 들어오면 여기서 걸린다.
       const minimumPassageLength = {
         "vc-main-idea-1": 300,
@@ -334,36 +366,38 @@ try {
       [question.stem, question.passage, question.box, visualText].join(" "),
     );
     const previousVisible = visibleQuestionsByKind.get(question.kindId) ?? [];
+    const visibleBigrams = bigrams(visible);
     for (const previous of previousVisible) {
       if (
         visible.length > 60 &&
         previous.text.length > 60 &&
+        bigramOverlap(visibleBigrams, previous.bigrams) > 0.9 &&
         similarity(visible, previous.text) > 0.985
       )
         fail(question.id, `${previous.id}와 화면 내용이 지나치게 유사함`);
     }
-    previousVisible.push({ id: question.id, text: visible });
+    previousVisible.push({ id: question.id, text: visible, bigrams: visibleBigrams });
     visibleQuestionsByKind.set(question.kindId, previousVisible);
   }
 
   for (const { kind } of expectedKinds)
-    if (countByKind.get(kind.id) !== 20)
-      fail(kind.id, `문항 수 ${countByKind.get(kind.id) ?? 0}개 (예상 20개)`);
+    if (countByKind.get(kind.id) !== PER_KIND)
+      fail(kind.id, `문항 수 ${countByKind.get(kind.id) ?? 0}개 (예상 ${PER_KIND}개)`);
 
   // 정답 번호가 한두 자리에 몰리면 문제를 풀지 않고도 답을 찍을 수 있다.
   for (const [kindId, positions] of answerPositions) {
     const used = positions.filter((count) => count > 0).length;
     if (used < 4) fail(kindId, `정답 번호 분포 ${positions.join("/")} (사용된 자리 ${used}개)`);
-    if (positions.some((count) => count > 10))
+    if (positions.some((count) => count > PER_KIND / 2))
       fail(kindId, `정답 번호 분포 ${positions.join("/")} (한 자리에 절반 초과)`);
   }
 
   // 스무 문항이 같은 해설을 쓰면 왜 그 선지가 답인지 알려 주지 못한다.
   for (const [kindId, texts] of explanationsByKind)
-    if (texts.size < 18)
-      fail(kindId, `해설이 문항별로 다르지 않음 (고유 해설 ${texts.size}개 / 20문항)`);
+    if (texts.size < PER_KIND * 0.9)
+      fail(kindId, `해설이 문항별로 다르지 않음 (고유 해설 ${texts.size}개 / ${PER_KIND}문항)`);
 
-  if ((correctChoicesByKind.get("vc-paragraph-order-1")?.size ?? 0) < 4)
+  if ((correctChoicesByKind.get("vc-paragraph-order-1")?.size ?? 0) < 8)
     fail("vc-paragraph-order-1", "문단 배열 정답 순서가 충분히 다양하지 않음");
 
   // 극단 표현이 오답이나 정답에 반복되면 지문을 읽지 않고도 답을 고를 수 있다.
@@ -374,14 +408,17 @@ try {
     "vc-inference-1",
   ]) {
     const cueCount = answerCueCounts.get(kindId) ?? 0;
-    if (cueCount > 5)
-      fail(kindId, `정답을 노출하는 극단 표현이 과다함 (${cueCount}개, 허용 5개)`);
+    const allowed = (5 * PER_KIND) / BASE_PER_KIND;
+    if (cueCount > allowed)
+      fail(kindId, `정답을 노출하는 극단 표현이 과다함 (${cueCount}개, 허용 ${allowed}개)`);
   }
 
   const sourceUrls = [new URL("../src/data/exampleQuestions.ts", import.meta.url)];
-  const bankDirectory = new URL("../src/data/exampleBanks/", import.meta.url);
-  for (const filename of await readdir(bankDirectory)) {
-    if (filename.endsWith(".ts")) sourceUrls.push(new URL(filename, bankDirectory));
+  for (const directory of ["../src/data/exampleBanks/", "../src/data/extraBanks/"]) {
+    const bankDirectory = new URL(directory, import.meta.url);
+    for (const filename of await readdir(bankDirectory)) {
+      if (filename.endsWith(".ts")) sourceUrls.push(new URL(filename, bankDirectory));
+    }
   }
   for (const sourceUrl of sourceUrls) {
     const source = await readFile(sourceUrl, "utf8");
@@ -390,10 +427,56 @@ try {
       if (match)
         fail(
           sourceUrl.pathname.split("/").at(-1),
-          `치환값 뒤 조사 고정: ${match.join(", ")} — ${line.trim()}`,
+          `치환값 뒤 조사 고정: ${match.join(", ")} (${line.trim()})`,
         );
     }
   }
+
+  const { PROBLEM_SETS, SET_SIZE } = await import("../src/data/problemSets.ts");
+  const { questionsForTutorial, balancedCategoryQuestions, balancedAllQuestions } =
+    await import("../src/data/tutorialQuestionGroups.ts");
+  const baseIds = new Set(baseQuestions.map(q => q.id));
+  const extraIds = new Set(extraQuestions.map(q => q.id));
+  const setIds = PROBLEM_SETS.flatMap(set => set.questions.map(q => q.id));
+  if (PROBLEM_SETS.length !== 84 || setIds.length !== questions.length ||
+      new Set(setIds).size !== questions.length || setIds.some(id => !ids.has(id)))
+    fail("sets", "문제셋 전체 문항의 포함 범위 또는 중복 오류");
+  for (const set of PROBLEM_SETS) {
+    if (set.questions.length !== SET_SIZE || set.questions.some(q => q.categoryId !== set.categoryId))
+      fail(set.id, "문제셋 크기 또는 영역 오류");
+    const originalCount = baseQuestions.filter(q => q.categoryId === set.categoryId).length / SET_SIZE;
+    if (set.number <= originalCount && set.questions.some(q => !baseIds.has(q.id)))
+      fail(set.id, "기존 문제셋에 추가 문항 노출");
+    if (set.number > originalCount && set.questions.some(q => !extraIds.has(q.id)))
+      fail(set.id, "추가 문제셋에 기본 문항 노출");
+  }
+  for (const { kind: { id: kindId } } of expectedKinds) {
+    const selected = questionsForTutorial(kindId);
+    if (selected.length !== BASE_PER_KIND || selected.some(q => q.kindId !== kindId || !baseIds.has(q.id)))
+      fail(kindId, "세부유형 선택의 기본 문항 범위 오류");
+  }
+  const originalRandom = Math.random;
+  const seenExtraKinds = new Set();
+  let randomState = 3817;
+  Math.random = () => ((randomState = (Math.imul(randomState, 1664525) + 1013904223) >>> 0) / 2 ** 32);
+  try {
+    for (let run = 0; run < 100; run++) {
+      for (const categoryId of new Set(questions.map(q => q.categoryId))) {
+        const selected = balancedCategoryQuestions(categoryId);
+        if (selected.length !== 20 || new Set(selected.map(q => q.id)).size !== 20 ||
+            selected.some(q => q.categoryId !== categoryId || !ids.has(q.id)))
+          fail(categoryId, "영역 랜덤 추출 범위 또는 중복 오류");
+        for (const q of selected) if (extraIds.has(q.id)) seenExtraKinds.add(q.kindId);
+      }
+      const selected = balancedAllQuestions();
+      if (selected.length !== 20 || new Set(selected.map(q => q.id)).size !== 20 ||
+          selected.some(q => !ids.has(q.id))) fail("random", "전체 랜덤 추출 범위 또는 중복 오류");
+      for (const categoryId of new Set(questions.map(q => q.categoryId)))
+        if (selected.filter(q => q.categoryId === categoryId).length !== 4)
+          fail(categoryId, "전체 랜덤 영역 배분 오류");
+    }
+    if (seenExtraKinds.size !== expectedKinds.length) fail("random", "추가 세부유형의 랜덤 추출 누락");
+  } finally { Math.random = originalRandom; }
 
   if (failures.length) {
     console.error(failures.join("\n"));
@@ -404,5 +487,5 @@ try {
     );
   }
 } finally {
-  await server.close();
+  loader.deregister();
 }
