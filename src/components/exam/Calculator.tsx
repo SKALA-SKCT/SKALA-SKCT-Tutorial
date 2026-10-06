@@ -1,7 +1,7 @@
 import { useEffect, useReducer } from "react";
 import { finishCalculation, nextExpression } from "./calculatorLogic";
 
-const KEY_INPUTS = [".", "+", "-", "×", "÷", "(", ")"];
+const KEY_INPUTS = [".", "+", "-", "×", "÷"];
 
 interface State {
   expression: string;
@@ -57,7 +57,7 @@ export default function Calculator() {
   }, []);
 
   const button = (label: string, value = label, className = "") => (
-    <button key={label} className={className} onClick={() => dispatch(buttonAction(value))}>
+    <button key={label} style={label === "C" ? { gridColumn: "1 / -1" } : undefined} className={className} onClick={() => dispatch(buttonAction(value))}>
       {label}
     </button>
   );
@@ -73,9 +73,7 @@ export default function Calculator() {
       </div>
       <div className="calc-display">{expression}</div>
       <div className="calc-grid">
-        {button("C", "C", "span-three operator")}
-        {button("(", "(", "operator")}
-        {button(")", ")", "operator")}
+        {button("C", "C", "operator")}
         {["7", "8", "9"].map((n) => button(n))}
         {button("÷", "÷", "operator")}
         {button("×", "×", "operator")}
