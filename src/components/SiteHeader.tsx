@@ -5,6 +5,7 @@ const motherUrl = "https://www.skala-skct.com";
 const mockUrl = "https://mock.skala-skct.com";
 const practiceUrl = "https://practice.skala-skct.com";
 const communityUrl = import.meta.env.VITE_COMMUNITY_URL ?? "https://community.skala-skct.com";
+const aiTutorUrl = import.meta.env.VITE_AI_TUTOR_URL ?? "https://ai-tutor.skala-skct.com";
 
 export default function SiteHeader() {
   const [accountOpen, setAccountOpen] = useState(false);
@@ -39,6 +40,7 @@ export default function SiteHeader() {
           <a className="active" href="/" aria-current="page">
             유형별 문제 연습
           </a>
+          <a href={aiTutorUrl}>AI 튜터</a>
           <a href={communityUrl}>게시판</a>
         </div>
 
